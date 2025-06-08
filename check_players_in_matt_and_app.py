@@ -1,143 +1,198 @@
 import pandas as pd
-from collections import Counter
+from collections import Counter, defaultdict
 
 def normalize_name(name):
     """Normalize names for comparison - remove extra spaces, convert to uppercase"""
     return ' '.join(name.strip().upper().split())
 
-# 1. Load the main teams file and extract U14 players
-print("Loading main teams file...")
-teams_file = 'data_in/mwc_2025_teams_export.tsv'
-df_teams = pd.read_csv(teams_file, sep='\t')
-
-# Extract U14 players from main file
-u14_teams_players = []
-for _, row in df_teams.iterrows():
-    if row['Age'] == 'U14':
+def load_teams_data(teams_file):
+    """Load and organize teams data by age group"""
+    print(f"Loading teams file: {teams_file}")
+    df_teams = pd.read_csv(teams_file, sep='\t')
+    
+    teams_data = defaultdict(list)
+    
+    for _, row in df_teams.iterrows():
+        age = row['Age']
         players_str = row['Players']
+        
         if pd.notna(players_str):
             players = [name.strip() for name in players_str.split(',') if name.strip()]
             for player in players:
-                u14_teams_players.append({
+                teams_data[age].append({
                     'name': normalize_name(player),
                     'original_name': player,
                     'country': row['Name']
                 })
-
-print(f"Found {len(u14_teams_players)} U14 players in teams file")
-
-# 2. Load the U14 registration file
-print("Loading U14 registration file...")
-u14_reg_file = 'data_in/mwc_2025_teams_u14 - MattSheetu14.tsv'
-df_u14_reg = pd.read_csv(u14_reg_file, sep='\t')
-
-# Extract players from registration file
-u14_reg_players = []
-for _, row in df_u14_reg.iterrows():
-    if pd.notna(row['First Name Last Name']):
-        full_name = row['First Name Last Name'].strip()
-        u14_reg_players.append({
-            'name': normalize_name(full_name),
-            'original_name': full_name,
-            'team': row.get('Team #', 'N/A'),
-            'dob': row.get('DOB', 'N/A'),
-            'gender': row.get('Gender', 'N/A')
-        })
-
-print(f"Found {len(u14_reg_players)} U14 players in registration file")
-
-# 3. Create sets for comparison
-teams_names = set([player['name'] for player in u14_teams_players])
-reg_names = set([player['name'] for player in u14_reg_players])
-
-# 4. Find matches and differences
-matches = teams_names.intersection(reg_names)
-only_in_teams = teams_names - reg_names
-only_in_registration = reg_names - teams_names
-
-# 5. Report results
-print("\n" + "=" * 80)
-print("U14 PLAYERS COMPARISON REPORT")
-print("=" * 80)
-
-print(f"\nSUMMARY:")
-print(f"Players in teams file: {len(teams_names)}")
-print(f"Players in registration file: {len(reg_names)}")
-print(f"Matching players: {len(matches)}")
-print(f"Only in teams file: {len(only_in_teams)}")
-print(f"Only in registration file: {len(only_in_registration)}")
-
-# 6. Show matching players
-if matches:
-    print(f"\n" + "=" * 50)
-    print(f"MATCHING PLAYERS ({len(matches)})")
-    print("=" * 50)
     
-    for name in sorted(matches):
-        # Find original names from both files
-        teams_original = next((p['original_name'] for p in u14_teams_players if p['name'] == name), name)
-        reg_original = next((p['original_name'] for p in u14_reg_players if p['name'] == name), name)
-        teams_country = next((p['country'] for p in u14_teams_players if p['name'] == name), 'N/A')
+    return teams_data
+
+def load_registration_data(reg_file, age_group):
+    """Load registration data for specific age group"""
+    print(f"Loading registration file: {reg_file}")
+    try:
+        df_reg = pd.read_csv(reg_file, sep='\t')
         
-        print(f"✓ {teams_original}")
-        if teams_original != reg_original:
-            print(f"  (Registration: {reg_original})")
-        print(f"  Country: {teams_country}")
+        reg_players = []
+        for _, row in df_reg.iterrows():
+            if pd.notna(row['First Name Last Name']):
+                full_name = row['First Name Last Name'].strip()
+                reg_players.append({
+                    'name': normalize_name(full_name),
+                    'original_name': full_name,
+                    'team': row.get('Team #', 'N/A'),
+                    'dob': row.get('DOB', 'N/A'),
+                    'gender': row.get('Gender', 'N/A')
+                })
+        
+        return reg_players
+    except FileNotFoundError:
+        print(f"WARNING: File {reg_file} not found!")
+        return []
+    except Exception as e:
+        print(f"ERROR loading {reg_file}: {e}")
+        return []
 
-# 7. Show players only in teams file
-if only_in_teams:
-    print(f"\n" + "=" * 50)
-    print(f"ONLY IN TEAMS FILE ({len(only_in_teams)})")
-    print("=" * 50)
+def compare_age_group(age, teams_players, reg_players):
+    """Compare players for a specific age group"""
+    teams_names = set([player['name'] for player in teams_players])
+    reg_names = set([player['name'] for player in reg_players])
     
-    for name in sorted(only_in_teams):
-        original_name = next((p['original_name'] for p in u14_teams_players if p['name'] == name), name)
-        country = next((p['country'] for p in u14_teams_players if p['name'] == name), 'N/A')
-        print(f"- {original_name} (Country: {country})")
-
-# 8. Show players only in registration file
-if only_in_registration:
-    print(f"\n" + "=" * 50)
-    print(f"ONLY IN REGISTRATION FILE ({len(only_in_registration)})")
-    print("=" * 50)
+    matches = teams_names.intersection(reg_names)
+    only_in_teams = teams_names - reg_names
+    only_in_registration = reg_names - teams_names
     
-    for name in sorted(only_in_registration):
-        reg_player = next((p for p in u14_reg_players if p['name'] == name), None)
-        if reg_player:
-            print(f"+ {reg_player['original_name']}")
-            print(f"  Team: {reg_player['team']}, DOB: {reg_player['dob']}, Gender: {reg_player['gender']}")
+    return {
+        'age': age,
+        'teams_count': len(teams_names),
+        'reg_count': len(reg_names),
+        'matches': matches,
+        'only_in_teams': only_in_teams,
+        'only_in_registration': only_in_registration,
+        'teams_players': teams_players,
+        'reg_players': reg_players
+    }
 
-# 9. Check for potential duplicates in registration file
-print(f"\n" + "=" * 50)
-print("DUPLICATE CHECK IN REGISTRATION FILE")
-print("=" * 50)
+# Configuration
+age_groups = ['U7', 'U8', 'U10', 'U12', 'U14']
+registration_files = {
+    'U7': 'data_in/mwc_2025_teams_u14 - MattSheetu7.tsv',
+    'U8': 'data_in/mwc_2025_teams_u14 - MattSheetu8.tsv',
+    'U10': 'data_in/mwc_2025_teams_u14 - MattSheetu10.tsv',
+    'U12': 'data_in/mwc_2025_teams_u14 - MattSheetu12.tsv',
+    'U14': 'data_in/mwc_2025_teams_u14 - MattSheetu14.tsv'
+}
 
-reg_name_counts = Counter([player['name'] for player in u14_reg_players])
-duplicates_in_reg = {name: count for name, count in reg_name_counts.items() if count > 1}
+# Load teams data
+teams_data = load_teams_data('data_in/mwc_2025_teams_export.tsv')
 
-if duplicates_in_reg:
-    print(f"Found {len(duplicates_in_reg)} duplicate names in registration file:")
-    for name, count in duplicates_in_reg.items():
-        print(f"  {name}: appears {count} times")
-        # Show all instances
-        instances = [p for p in u14_reg_players if p['name'] == name]
-        for i, instance in enumerate(instances, 1):
-            print(f"    {i}. {instance['original_name']} (Team: {instance['team']})")
+# Load registration data for each age group
+registration_data = {}
+for age in age_groups:
+    if age in registration_files:
+        registration_data[age] = load_registration_data(registration_files[age], age)
+    else:
+        registration_data[age] = []
+
+# Compare each age group
+comparisons = {}
+for age in age_groups:
+    teams_players = teams_data.get(age, [])
+    reg_players = registration_data.get(age, [])
+    comparisons[age] = compare_age_group(age, teams_players, reg_players)
+
+# Generate comprehensive report
+print("\n" + "=" * 100)
+print("MULTI-AGE GROUP COMPARISON REPORT")
+print("=" * 100)
+
+# Summary table
+print("\nSUMMARY TABLE:")
+print("-" * 80)
+print(f"{'Age':<4} {'Teams':<7} {'Reg':<7} {'Match':<7} {'Teams Only':<11} {'Reg Only':<9} {'Match %':<8}")
+print("-" * 80)
+
+total_teams = 0
+total_reg = 0
+total_matches = 0
+
+for age in age_groups:
+    comp = comparisons[age]
+    match_pct = (len(comp['matches']) / max(comp['teams_count'], comp['reg_count']) * 100) if max(comp['teams_count'], comp['reg_count']) > 0 else 0
+    
+    print(f"{age:<4} {comp['teams_count']:<7} {comp['reg_count']:<7} {len(comp['matches']):<7} {len(comp['only_in_teams']):<11} {len(comp['only_in_registration']):<9} {match_pct:<7.1f}%")
+    
+    total_teams += comp['teams_count']
+    total_reg += comp['reg_count']
+    total_matches += len(comp['matches'])
+
+print("-" * 80)
+overall_match_pct = (total_matches / max(total_teams, total_reg) * 100) if max(total_teams, total_reg) > 0 else 0
+print(f"{'TOT':<4} {total_teams:<7} {total_reg:<7} {total_matches:<7} {'':<11} {'':<9} {overall_match_pct:<7.1f}%")
+
+# Detailed analysis for each age group
+for age in age_groups:
+    comp = comparisons[age]
+    
+    if comp['teams_count'] == 0 and comp['reg_count'] == 0:
+        continue
+        
+    print(f"\n" + "=" * 60)
+    print(f"{age} DETAILED ANALYSIS")
+    print("=" * 60)
+    
+    # Perfect match check
+    if len(comp['matches']) == comp['teams_count'] == comp['reg_count'] and comp['teams_count'] > 0:
+        print(f"✅ PERFECT MATCH: All {comp['teams_count']} players match between files!")
+        continue
+    
+    # Show mismatches
+    if comp['only_in_teams']:
+        print(f"\n🔍 ONLY IN TEAMS FILE ({len(comp['only_in_teams'])}):")
+        for name in sorted(comp['only_in_teams']):
+            original_name = next((p['original_name'] for p in comp['teams_players'] if p['name'] == name), name)
+            country = next((p['country'] for p in comp['teams_players'] if p['name'] == name), 'N/A')
+            print(f"  - {original_name} (Country: {country})")
+    
+    if comp['only_in_registration']:
+        print(f"\n📋 ONLY IN REGISTRATION FILE ({len(comp['only_in_registration'])}):")
+        for name in sorted(comp['only_in_registration']):
+            reg_player = next((p for p in comp['reg_players'] if p['name'] == name), None)
+            if reg_player:
+                print(f"  + {reg_player['original_name']} (Team: {reg_player['team']})")
+    
+    # Check for duplicates in registration
+    if comp['reg_players']:
+        reg_name_counts = Counter([player['name'] for player in comp['reg_players']])
+        duplicates = {name: count for name, count in reg_name_counts.items() if count > 1}
+        
+        if duplicates:
+            print(f"\n⚠️  DUPLICATES IN REGISTRATION ({len(duplicates)}):")
+            for name, count in duplicates.items():
+                instances = [p for p in comp['reg_players'] if p['name'] == name]
+                print(f"  {name} (appears {count} times):")
+                for i, instance in enumerate(instances, 1):
+                    print(f"    {i}. {instance['original_name']} (Team: {instance['team']})")
+
+# Overall statistics
+print(f"\n" + "=" * 60)
+print("OVERALL STATISTICS")
+print("=" * 60)
+
+perfect_matches = sum(1 for age in age_groups if len(comparisons[age]['matches']) == comparisons[age]['teams_count'] == comparisons[age]['reg_count'] and comparisons[age]['teams_count'] > 0)
+age_groups_with_data = sum(1 for age in age_groups if comparisons[age]['teams_count'] > 0 or comparisons[age]['reg_count'] > 0)
+
+print(f"Age groups analyzed: {age_groups_with_data}")
+print(f"Perfect matches: {perfect_matches}")
+print(f"Age groups with discrepancies: {age_groups_with_data - perfect_matches}")
+print(f"Total players in teams file: {total_teams}")
+print(f"Total players in registration files: {total_reg}")
+print(f"Overall match rate: {overall_match_pct:.1f}%")
+
+# Final status
+if perfect_matches == age_groups_with_data and age_groups_with_data > 0:
+    print("\n🎉 ALL AGE GROUPS HAVE PERFECT MATCHES!")
+elif total_matches == max(total_teams, total_reg):
+    print("\n✅ COMPLETE MATCH: All players accounted for!")
 else:
-    print("No duplicate names found in registration file.")
-
-# 10. Final statistics
-print(f"\n" + "=" * 50)
-print("FINAL STATISTICS")
-print("=" * 50)
-
-match_percentage = (len(matches) / max(len(teams_names), len(reg_names))) * 100
-print(f"Match rate: {match_percentage:.1f}%")
-print(f"Total unique players across both files: {len(teams_names.union(reg_names))}")
-
-if len(matches) == len(teams_names) == len(reg_names):
-    print("✅ PERFECT MATCH: All players appear in both files!")
-elif len(only_in_teams) == 0 and len(only_in_registration) == 0:
-    print("✅ COMPLETE MATCH: Same players in both files!")
-else:
-    print("⚠️  DIFFERENCES FOUND: Files contain different player lists.")
+    print(f"\n⚠️  DISCREPANCIES FOUND: {age_groups_with_data - perfect_matches} age groups have mismatches.")
