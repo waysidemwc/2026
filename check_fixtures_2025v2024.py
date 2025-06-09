@@ -116,6 +116,10 @@ def load_2025_fixtures():
         
         for age, fixtures in fixtures_2025.items():
             print(f"    {age}: {len(fixtures)} fixtures")
+            # Debug: show sample dates for U14
+            if age == 'U14':
+                unique_days = set(f.get('day', 'N/A') for f in fixtures)
+                print(f"      U14 days: {sorted(unique_days)}")
         
         return dict(fixtures_2025)
         
@@ -201,6 +205,10 @@ def generate_markdown_report(results, fixtures_2024, fixtures_2025):
             if r['matches'] == r['total_2024'] == r['total_2025'] and len(r['mismatches']) == 0:
                 f.write(f"✅ **PERFECT MATCH:** All {r['matches']} fixtures match perfectly!\n\n")
                 continue
+            
+            # Show status summary
+            if r['matches'] < r['total_2024'] or r['matches'] < r['total_2025']:
+                f.write(f"⚠️ **PARTIAL MATCH:** {r['matches']} out of {max(r['total_2024'], r['total_2025'])} fixtures match\n\n")
             
             # Pitch/field mismatches
             if r['mismatches']:
@@ -315,6 +323,20 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
     print(f"2024 fixtures: {len(fixtures_2024)}")
     print(f"2025 fixtures: {len(fixtures_2025)}")
     
+    # Debug: Show sample fixture keys for U14
+    if age == 'U14':
+        print("Sample 2024 fixture data:")
+        for fixture in fixtures_2024[:2]:
+            print(f"  day: '{fixture.get('day', 'N/A')}', original_time: '{fixture.get('original_time', 'N/A')}'")
+            key = create_fixture_key(fixture)
+            print(f"  key: {key}")
+        print("Sample 2025 fixture data:")
+        for fixture in fixtures_2025[:2]:
+            print(f"  day: '{fixture.get('day', 'N/A')}', original_time: '{fixture.get('original_time', 'N/A')}'")
+            key = create_fixture_key(fixture)
+            print(f"  key: {key}")
+        print()
+    
     # Create lookup dictionaries
     fixtures_2024_dict = {create_fixture_key(f): f for f in fixtures_2024}
     fixtures_2025_dict = {create_fixture_key(f): f for f in fixtures_2025}
@@ -341,6 +363,7 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
                     'f2025': f2025,
                     'issue': 'pitch_mismatch'
                 })
+        # Note: fixtures not in both years are handled separately below
     
     # Find fixtures only in one year
     keys_2024 = set(fixtures_2024_dict.keys())
@@ -354,6 +377,9 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
         print(f"✅ PERFECT MATCH: All {matches} fixtures match perfectly!")
     else:
         print(f"✅ Perfect matches: {matches}")
+        
+        if matches < len(fixtures_2024) or matches < len(fixtures_2025):
+            print(f"⚠️  Partial match: {matches} out of {max(len(fixtures_2024), len(fixtures_2025))} fixtures match")
         
         if mismatches:
             print(f"⚠️  Pitch/field mismatches: {len(mismatches)}")
@@ -381,16 +407,29 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
             if len(only_2025) > 3:
                 print(f"    ... and {len(only_2025) - 3} more")
     
+    # Debug output for partial matches
+    if matches + len(mismatches) < max(len(fixtures_2024), len(fixtures_2025)):
+        total_found = matches + len(mismatches)
+        print(f"DEBUG: Found {len(only_2024)} fixtures only in 2024, {len(only_2025)} fixtures only in 2025")
+        print(f"DEBUG: {matches} perfect matches + {len(mismatches)} pitch mismatches = {total_found} total matched")
+        if only_2024:
+            print("Sample 2024-only fixtures:")
+            for fixture in only_2024[:3]:
+                print(f"  Key: {create_fixture_key(fixture)}")
+        if only_2025:
+            print("Sample 2025-only fixtures:")
+            for fixture in only_2025[:3]:
+                print(f"  Key: {create_fixture_key(fixture)}")
+    
     return {
         'matches': matches,
         'mismatches': mismatches,
-        'missing_2024': only_2025,
-        'missing_2025': only_2024,
+        'missing_2024': only_2025,  # Fixtures only in 2025 (missing from 2024)
+        'missing_2025': only_2024,  # Fixtures only in 2024 (missing from 2025)
         'total_2024': len(fixtures_2024),
         'total_2025': len(fixtures_2025)
     }
-
-
+ 
 # Main execution
 print("=" * 80)
 print("2024 vs 2025 FIXTURES COMPARISON (WITH PITCH REMAPPING)")
@@ -455,9 +494,15 @@ for age in age_groups:
     elif len(r['missing_2024']) > 0 or len(r['missing_2025']) > 0:
         status = "📅 Different fixtures"
     else:
-        status = "Unknown"
+        status = f"❓ Unknown ({r['matches']}/{r['total_2024']} matched)"
     
     print(f"{age:<4} {r['total_2024']:<6} {r['total_2025']:<6} {r['matches']:<6} {len(r['mismatches']):<9} {status:<20}")
+    
+    # Debug info for Unknown status
+    if "Unknown" in status:
+        missing_2024_count = len(r.get('missing_2024', []))
+        missing_2025_count = len(r.get('missing_2025', []))
+        print(f"     DEBUG: missing_2024={missing_2024_count}, missing_2025={missing_2025_count}")
 
 # Final assessment
 perfect_age_groups = sum(1 for r in results.values() 

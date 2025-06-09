@@ -1,6 +1,6 @@
 # 2024 vs 2025 Fixtures Comparison Report
 
-**Generated:** 2025-06-09 09:51:31
+**Generated:** 2025-06-09 10:18:57
 
 ## Executive Summary
 
@@ -39,6 +39,8 @@
 ### U14
 
 **2024 fixtures:** 56 | **2025 fixtures:** 56 | **Perfect matches:** 28
+
+⚠️ **PARTIAL MATCH:** 28 out of 56 fixtures match
 
 ### U7
 
