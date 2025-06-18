@@ -130,9 +130,44 @@ def load_2025_fixtures():
         print(f"  ERROR loading {filename}: {e}")
         return {}
 
+def normalize_date_to_day(date_str):
+    """Convert actual dates to day1/day2 for comparison"""
+    if not date_str or str(date_str).strip() in ['nan', 'N/A', '']:
+        return ""
+    
+    date_str = str(date_str).strip()
+    
+    # 2024 dates: 2024-06-11 = day1, 2024-06-13 = day2
+    if '2024-06-11' in date_str:
+        return "day1"
+    elif '2024-06-13' in date_str:
+        return "day2"
+    # 2025 dates: first date = day1, second date = day2
+    elif '06-10-2025' in date_str:
+        return "day1"
+    elif '06-12-2025' in date_str:
+        return "day2"
+    else:
+        return ""
+
 def create_fixture_key(fixture):
-    """Create a unique key for fixture matching"""
-    return f"{fixture['time']}_{fixture['team1']}_{fixture['team2']}"
+    """Create a unique key for fixture matching using normalized days"""
+    # Extract date from time or day field
+    date_part = ""
+    
+    # Try 'day' field first (for 2025 data)
+    if 'day' in fixture and fixture['day']:
+        date_part = normalize_date_to_day(fixture['day'])
+    
+    # Try 'original_time' field (for 2024 data)  
+    if not date_part and 'original_time' in fixture and fixture['original_time']:
+        time_str = str(fixture['original_time']).strip()
+        if ' ' in time_str:
+            actual_date = time_str.split(' ')[0]
+            date_part = normalize_date_to_day(actual_date)
+    
+    key = f"{date_part}_{fixture['time']}_{fixture['team1']}_{fixture['team2']}"
+    return key
 
 def generate_markdown_report(results, fixtures_2024, fixtures_2025):
     """Generate comprehensive markdown report"""
@@ -324,18 +359,16 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
     print(f"2025 fixtures: {len(fixtures_2025)}")
     
     # Debug: Show sample fixture keys for U14
-    if age == 'U14':
-        print("Sample 2024 fixture data:")
-        for fixture in fixtures_2024[:2]:
-            print(f"  day: '{fixture.get('day', 'N/A')}', original_time: '{fixture.get('original_time', 'N/A')}'")
-            key = create_fixture_key(fixture)
-            print(f"  key: {key}")
-        print("Sample 2025 fixture data:")
-        for fixture in fixtures_2025[:2]:
-            print(f"  day: '{fixture.get('day', 'N/A')}', original_time: '{fixture.get('original_time', 'N/A')}'")
-            key = create_fixture_key(fixture)
-            print(f"  key: {key}")
-        print()
+    #if age == 'U14':
+    #    print("Sample 2024 fixture data:")
+    #    for fixture in fixtures_2024[:2]:
+    #        key = create_fixture_key(fixture)
+    #        print(f"  original_time: '{fixture.get('original_time', 'N/A')}' → key: {key}")
+    #    print("Sample 2025 fixture data:")
+    #    for fixture in fixtures_2025[:2]:
+    #        key = create_fixture_key(fixture)
+    #        print(f"  day: '{fixture.get('day', 'N/A')}' → key: {key}")
+    #    print()
     
     # Create lookup dictionaries
     fixtures_2024_dict = {create_fixture_key(f): f for f in fixtures_2024}
@@ -429,7 +462,7 @@ def compare_fixtures_for_age(age, fixtures_2024, fixtures_2025):
         'total_2024': len(fixtures_2024),
         'total_2025': len(fixtures_2025)
     }
- 
+  
 # Main execution
 print("=" * 80)
 print("2024 vs 2025 FIXTURES COMPARISON (WITH PITCH REMAPPING)")
