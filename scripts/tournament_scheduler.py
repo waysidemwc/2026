@@ -404,10 +404,12 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         for p in zones[z]: html += f'<div class="pitch-card">{p["name"]}<br><small>{p["age"]}</small></div>'
         html += '</div></div>'
     
-    html += '</div><hr><h2>2. Age Group Breakdown</h2><div class="table-container"><table><thead><tr><th>Age Group</th><th>Teams</th><th>Players/Team</th><th>Total Players</th><th>Matches</th><th>Pitches Req.</th><th>Zone</th></tr></thead><tbody>'
+    html += '</div><hr><h2>2. Age Group Breakdown</h2><div class="table-container"><table><thead><tr><th>Age Group</th><th>Teams</th><th>Players/Team</th><th>Total Players</th><th>Matches/Team</th><th>Play Time %</th><th>Total Matches</th><th>Pitches Req.</th><th>Zone</th></tr></thead><tbody>'
     for a in allocations:
         z = a['assigned_pitches'][0]['zone']
-        html += f"<tr><td><strong>{a['age_group']}</strong></td><td>{a['teams']} Teams</td><td>{a.get('players_per_team', 'N/A')}</td><td>{a.get('total_players', 'N/A')}</td><td>{a['matches']} Matches</td><td>{a['pitches_req']}</td><td><span class='{z.lower()}'>{z}</span></td></tr>"
+        matches_per_team = a['teams'] - 1
+        play_time_pct = (matches_per_team / 16) * 100
+        html += f"<tr><td><strong>{a['age_group']}</strong></td><td>{a['teams']} Teams</td><td>{a.get('players_per_team', 'N/A')}</td><td>{a.get('total_players', 'N/A')}</td><td>{matches_per_team}</td><td>{play_time_pct:.1f}%</td><td>{a['matches']}</td><td>{a['pitches_req']}</td><td><span class='{z.lower()}'>{z}</span></td></tr>"
     
     html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule</h2><div class="table-container"><table><thead><tr><th>Pitch</th>'
     for i in range(1, 17): html += f"<th>S{i}</th>"
