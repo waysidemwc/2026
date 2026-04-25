@@ -160,10 +160,11 @@ def schedule_10_teams(teams):
 # ==========================================
 
 def discover_configurations(total_pitches):
+    # Discovery defaults for player estimates
     blocks = [
-        {'teams': 6, 'pitches': 1, 'matches': 15},
-        {'teams': 8, 'pitches': 2, 'matches': 28},
-        {'teams': 10, 'pitches': 3, 'matches': 45}
+        {'teams': 6, 'pitches': 1, 'matches': 15, 'players_per_team': 5},
+        {'teams': 8, 'pitches': 2, 'matches': 28, 'players_per_team': 8},
+        {'teams': 10, 'pitches': 3, 'matches': 45, 'players_per_team': 9}
     ]
     valid_configs = []
     
@@ -173,6 +174,7 @@ def discover_configurations(total_pitches):
             if used_pitches == total_pitches:
                 total_teams = sum(item['teams'] for item in combo)
                 total_matches = sum(item['matches'] for item in combo)
+                total_players = sum(item['teams'] * item['players_per_team'] for item in combo)
                 
                 counts = {6: 0, 8: 0, 10: 0}
                 for item in combo:
@@ -182,8 +184,9 @@ def discover_configurations(total_pitches):
                     'num_age_groups': num_age_groups,
                     'total_teams': total_teams,
                     'total_matches': total_matches,
+                    'total_players': total_players,
                     'used_pitches': used_pitches,
-                    'spare_pitches': 0, # Always 0 now
+                    'spare_pitches': 0,
                     'breakdown': counts
                 }
                 
@@ -205,6 +208,7 @@ def print_configurations(total_pitches):
         print(f"Option {i}: {config['num_age_groups']} Age Groups")
         print(f"  TOTAL:")
         print(f"  - {config['total_teams']} Teams")
+        print(f"  - {config['total_players']} Players (approx)")
         print(f"  - {config['total_matches']} Matches")
         print(f"  - {config['used_pitches']} Pitches {spare_text}")
         print(f"  BREAKDOWN:")
@@ -268,17 +272,19 @@ def allocate_tournament(option_name, age_groups):
     for group in sorted_groups:
         age = group['age']
         teams = group['teams']
+        players_per = group.get('players_per_team', 0)
         matches, pitches_needed = get_requirements(teams)
         
         placed = False
         # Try to find a zone with enough capacity to keep the group unified
-        # We check zones JP1, JP2, JP3, JP4 in order
         for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
             if len(zone_inventory[z_name]) >= pitches_needed:
                 assigned = [zone_inventory[z_name].pop(0) for _ in range(pitches_needed)]
                 allocations_map[age] = {
                     'age_group': age,
                     'teams': teams,
+                    'players_per_team': players_per,
+                    'total_players': teams * players_per,
                     'matches': matches,
                     'pitches_req': pitches_needed,
                     'assigned_pitches': assigned
@@ -287,7 +293,7 @@ def allocate_tournament(option_name, age_groups):
                 break
         
         if not placed:
-            # Fallback: Scrape remaining pitches from any zone (should rarely happen with 14 pitches)
+            # Fallback
             assigned = []
             for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
                 while zone_inventory[z_name] and len(assigned) < pitches_needed:
@@ -297,6 +303,8 @@ def allocate_tournament(option_name, age_groups):
                 allocations_map[age] = {
                     'age_group': age,
                     'teams': teams,
+                    'players_per_team': players_per,
+                    'total_players': teams * players_per,
                     'matches': matches,
                     'pitches_req': pitches_needed,
                     'assigned_pitches': assigned
@@ -304,7 +312,6 @@ def allocate_tournament(option_name, age_groups):
             else:
                 raise ValueError(f"Critically failed to allocate {pitches_needed} pitches for {age}")
 
-    # 3. Restore original age group order for the final output
     final_allocations = []
     for g in age_groups:
         final_allocations.append(allocations_map[g['age']])
@@ -326,17 +333,12 @@ def generate_master_schedule(allocations, team_rosters):
         team_count = alloc['teams']
         pitches = alloc['assigned_pitches']
         
-        # Pull real team names from roster, or auto-generate placeholders if missing
         roster = team_rosters.get(age, [f"{age}-Team {i}" for i in range(1, team_count + 1)])
         
         group_matches = []
-        
-        if team_count == 6:
-            group_matches = schedule_6_teams(roster)
-        elif team_count == 8:
-            group_matches = schedule_8_teams(roster)
-        elif team_count == 10:
-            group_matches = schedule_10_teams(roster)
+        if team_count == 6: group_matches = schedule_6_teams(roster)
+        elif team_count == 8: group_matches = schedule_8_teams(roster)
+        elif team_count == 10: group_matches = schedule_10_teams(roster)
             
         for m in group_matches:
             pitch_obj = pitches[m['pitch_idx']]
@@ -362,10 +364,7 @@ def export_to_csv(master_schedule, filename="master_schedule.csv"):
     """Writes the master schedule to a CSV file."""
     print(f"Exporting to CSV: {filename}...")
     keys = ['age_group', 'slot', 'time_label', 'zone', 'pitch_name', 'pitch_id', 'team1', 'team2']
-    
-    # Sort chronologically, then by zone/pitch
     sorted_schedule = sorted(master_schedule, key=lambda x: (x['slot'], x['zone'], x['pitch_id']))
-    
     with open(filename, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
@@ -375,14 +374,13 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     """Generates the high-level dashboard with Zone Map, Breakdown, and Abstract Schedule Grid."""
     print(f"Exporting Summary Dashboard: {filename}...")
     
-    # 1. Prepare Totals Summary
     total_teams = sum(a['teams'] for a in allocations)
     total_matches = len(master_schedule)
+    total_players = config_info['total_players'] if config_info else sum(a.get('total_players', 0) for a in allocations)
     used_pitches = sum(a['pitches_req'] for a in allocations)
     spare_pitches = config_info['spare_pitches'] if config_info else 0
     spare_text = f"({spare_pitches} spare)" if spare_pitches > 0 else "(No spare pitches)"
 
-    # 2. Prepare Zone Map Data
     zones = {}
     for alloc in allocations:
         for pitch in alloc['assigned_pitches']:
@@ -390,15 +388,12 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
             if z not in zones: zones[z] = []
             zones[z].append({'name': pitch['name'], 'age': alloc['age_group']})
             
-    # 3. Prepare Active Slots Map
     pitch_schedule = {}
     for match in master_schedule:
         p_id = match['pitch_id']
-        if p_id not in pitch_schedule:
-            pitch_schedule[p_id] = {}
+        if p_id not in pitch_schedule: pitch_schedule[p_id] = {}
         pitch_schedule[p_id][match['slot']] = match['age_group']
 
-    # 4. Build HTML Structure
     nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; Back to Recommended Proposal Index</a></div>' if index_link else ""
     
     css = """
@@ -439,39 +434,36 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     <div class="summary-bar">
         <div class="summary-item"><span class="val">{len(allocations)}</span><span class="lbl">Age Groups</span></div>
         <div class="summary-item"><span class="val">{total_teams}</span><span class="lbl">Total Teams</span></div>
+        <div class="summary-item"><span class="val">{total_players}</span><span class="lbl">Total Players</span></div>
         <div class="summary-item"><span class="val">{total_matches}</span><span class="lbl">Total Matches</span></div>
         <div class="summary-item"><span class="val">{used_pitches}</span><span class="lbl">Pitches {spare_text}</span></div>
     </div>
     <hr><h2>1. Pitch Map & Zone Assignment</h2><div class="zone-wrapper">"""
     
-    # Generate Zone Map
     for z in sorted(zones.keys()):
         html += f'<div class="zone {z.lower()}"><h3>{z}</h3><div class="pitch-grid">'
         for p in zones[z]:
             html += f'<div class="pitch-card">{p["name"]}<br><span class="age-label">{p["age"]}</span></div>'
         html += '</div></div>'
-    html += '</div><hr><h2>2. Age Group Breakdown</h2><div class="table-container"><table><thead><tr><th>Age Group</th><th>Teams</th><th>Total Matches</th><th>Pitches Req.</th><th>Dedicated Pitches</th><th>Zone</th></tr></thead><tbody>'
+    html += '</div><hr><h2>2. Age Group Breakdown</h2><div class="table-container"><table><thead><tr><th>Age Group</th><th>Teams</th><th>Players/Team</th><th>Total Players</th><th>Matches</th><th>Pitches Req.</th><th>Dedicated Pitches</th><th>Zone</th></tr></thead><tbody>'
     
-    # Generate Breakdown Table
     for alloc in allocations:
         p_names = ", ".join([p['name'] for p in alloc['assigned_pitches']])
         primary_zone = alloc['assigned_pitches'][0]['zone']
-        html += f"<tr><td><strong>{alloc['age_group']}</strong></td><td>{alloc['teams']} Teams</td><td>{alloc['matches']} Matches</td><td>{alloc['pitches_req']}</td><td>{p_names}</td><td><span style='font-weight:bold;' class='{primary_zone.lower()}'>{primary_zone}</span></td></tr>"
+        html += f"<tr><td><strong>{alloc['age_group']}</strong></td><td>{alloc['teams']} Teams</td><td>{alloc.get('players_per_team', 'N/A')}</td><td>{alloc.get('total_players', 'N/A')}</td><td>{alloc['matches']} Matches</td><td>{alloc['pitches_req']}</td><td>{p_names}</td><td><span style='font-weight:bold;' class='{primary_zone.lower()}'>{primary_zone}</span></td></tr>"
     html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule (16 Slots Total)</h2><div class="table-container"><table><thead><tr><th rowspan="2">Pitch</th><th colspan="8" class="day-header">Tuesday (6:30 PM - 8:30 PM)</th><th colspan="8" class="day-header" style="background-color: #2c3e50;">Thursday (6:30 PM - 8:30 PM)</th></tr><tr class="time-header">'
     
-    # Generate Time Headers
     times = ["6:30 - 6:45", "6:45 - 7:00", "7:00 - 7:15", "7:15 - 7:30", "7:30 - 7:45", "7:45 - 8:00", "8:00 - 8:15", "8:15 - 8:30"] * 2
     for t in times: html += f"<th>{t}</th>"
     html += '</tr></thead><tbody>'
     
-    # Generate Grid
     assigned_pitches = [p for alloc in allocations for p in alloc['assigned_pitches']]
     for p in sorted(assigned_pitches, key=lambda x: int(x['name'].replace('Pitch ', '')) if 'Pitch ' in x['name'] else x['name']):
         html += f"<tr><td><strong>{p['name']}</strong></td>"
         for slot in range(1, 17):
             age = pitch_schedule.get(p['id'], {}).get(slot)
             if age:
-                age_clean = age.split(' ')[0].lower() # Handle groups like 'U11 Mixed'
+                age_clean = age.split(' ')[0].lower()
                 html += f'<td class="cell-{age_clean}">{age}</td>'
             else:
                 html += '<td class="cell-break">Break</td>'
@@ -479,7 +471,6 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
 
     html += "</tbody></table></div>"
     
-    # Add Discovery Options List if present
     if discovery_configs:
         params_html = """
         <div class="discovery-list">
@@ -506,22 +497,20 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                         </ul>
                     </div>
                 </div>
-                
                 <h4 style="margin-top:20px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">The Optimal Team Blocks</h4>
                 <p>To maximize pitch efficiency while keeping age groups unified, we use these optimized bracket sizes:</p>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap; text-align: center;">
                     <div style="flex: 1; background: #e8f8f5; padding: 10px; border-radius: 5px; border-left: 5px solid #1abc9c;">
-                        <strong>6 Teams</strong><br>15 matches | 1 Pitch<br><small>1 spare slot</small>
+                        <strong>6 Teams</strong><br>15 matches | 1 Pitch<br>5 Players per Team
                     </div>
                     <div style="flex: 1; background: #ebf5fb; padding: 10px; border-radius: 5px; border-left: 5px solid #3498db;">
-                        <strong>8 Teams</strong><br>28 matches | 2 Pitches<br><small>2 spare slots</small>
+                        <strong>8 Teams</strong><br>28 matches | 2 Pitches<br>8 Players per Team
                     </div>
                     <div style="flex: 1; background: #fef9e7; padding: 10px; border-radius: 5px; border-left: 5px solid #f1c40f;">
-                        <strong>10 Teams</strong><br>45 matches | 3 Pitches<br><small>1 spare slot</small>
+                        <strong>10 Teams</strong><br>45 matches | 3 Pitches<br>9 Players per Team
                     </div>
                 </div>
             </div>
-            
             <hr>
             <h2>Explore Other Discovery Options</h2>
             <div class="table-container">
@@ -531,11 +520,10 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                             <th>Option</th>
                             <th>Age Groups</th>
                             <th>Total Teams</th>
+                            <th>Total Players</th>
                             <th>Total Matches</th>
                             <th>Pitches</th>
                             <th>Dashboard</th>
-                            <th>Matchup Grid</th>
-                            <th>Data</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -544,20 +532,15 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         for i, config in enumerate(discovery_configs, 1):
             suffix = f"option_{i}"
             db_link = f"options_output/summary_dashboard_{suffix}.html"
-            grid_link = f"options_output/master_schedule_grid_{suffix}.html"
-            csv_link = f"options_output/master_schedule_{suffix}.csv"
-            html += f"<tr><td><strong>Option {i}</strong></td><td>{config['num_age_groups']}</td><td>{config['total_teams']}</td><td>{config['total_matches']}</td><td>14</td><td><a href='{db_link}'>View Dashboard</a></td><td><a href='{grid_link}'>View Grid</a></td><td><a href='{csv_link}'>Download CSV</a></td></tr>"
+            html += f"<tr><td><strong>Option {i}</strong></td><td>{config['num_age_groups']}</td><td>{config['total_teams']}</td><td>{config['total_players']}</td><td>{config['total_matches']}</td><td>14</td><td><a href='{db_link}'>View Dashboard</a></td></tr>"
         html += '</tbody></table></div></div>'
 
     html += "</div></body></html>"
-    
-    with open(filename, 'w') as f:
-        f.write(html)
+    with open(filename, 'w') as f: f.write(html)
 
 def generate_detailed_html_grid(master_schedule, allocations, filename="master_schedule_grid.html"):
     """Generates the detailed matchup visualization matrix (Team vs Team)."""
     print(f"Exporting Detailed HTML Grid: {filename}...")
-    
     grid_data = {}
     for match in master_schedule:
         p_name = match['pitch_name']
@@ -581,7 +564,6 @@ def generate_detailed_html_grid(master_schedule, allocations, filename="master_s
     """
     for i in range(1, 17): html += f"<th>S{i}<br>{TIME_MAP[i].split(' ')[1]}</th>"
     html += "</tr></thead><tbody>"
-    
     for alloc in allocations:
         age_class = f"background-color: #e8f8f5;"
         for pitch in alloc['assigned_pitches']:
@@ -591,7 +573,6 @@ def generate_detailed_html_grid(master_schedule, allocations, filename="master_s
                 matchup = grid_data.get(p_name, {}).get(slot, "<span class='break'>Rest/Break</span>")
                 html += f"<td>{matchup}</td>"
             html += "</tr>"
-
     html += "</tbody></table></div></body></html>"
     with open(filename, 'w') as f: f.write(html)
 
@@ -603,20 +584,18 @@ def map_config_to_ages(config, start_age=6):
     """Maps a configuration breakdown to a list of age groups with team counts."""
     age_groups = []
     current_age = start_age
-    # Process 6, 8, then 10 to keep ages somewhat ordered by bracket size
     for teams in [6, 8, 10]:
         count = config['breakdown'][teams]
+        players_map = {6: 5, 8: 8, 10: 9}
         for _ in range(count):
-            age_groups.append({'age': f'U{current_age}', 'teams': teams})
+            age_groups.append({'age': f'U{current_age}', 'teams': teams, 'players_per_team': players_map[teams]})
             current_age += 1
     return age_groups
 
 def generate_readme_index(configs, output_dir, filename="README.md", final_info=None):
     """Generates a README.md index linking to all generated options."""
     print(f"Generating README Index: {filename}...")
-    
     content = "# Wayside Mini World Cup 2026 - Tournament Configurations\n\n"
-    
     if final_info:
         content += "## 🏆 RECOMMENDED PROPOSAL\n\n"
         content += "This configuration is tailored to the specific age group and team count requirements provided.\n\n"
@@ -626,138 +605,80 @@ def generate_readme_index(configs, output_dir, filename="README.md", final_info=
         content += "### Proposal Summary:\n"
         content += f"- **{final_info['num_age_groups']}** Age Groups\n"
         content += f"- **{final_info['total_teams']}** Total Teams\n"
+        content += f"- **{final_info['total_players']}** Total Players\n"
         content += f"- **{final_info['total_matches']}** Total Matches\n"
         content += f"- **{final_info['used_pitches']}** Pitches (No spare pitches)\n\n"
         content += "---\n\n"
-
     content += "## Discovery Options\n\n"
-    content += "This repository contains various tournament configurations for 14 pitches. Each option represents a different way to balance age groups, team counts, and match volume.\n\n"
-    content += "| Option | Age Groups | Total Teams | Total Matches | Dashboards | Grids | Data |\n"
-    content += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
-    
+    content += "| Option | Age Groups | Teams | Players | Matches | Dashboards |\n"
+    content += "| :--- | :--- | :--- | :--- | :--- | :--- |\n"
     for i, config in enumerate(configs, 1):
         suffix = f"option_{i}"
         dashboard = f"[Dashboard](options_output/summary_dashboard_{suffix}.html)"
-        grid = f"[Matchup Grid](options_output/master_schedule_grid_{suffix}.html)"
-        csv_link = f"[CSV](options_output/master_schedule_{suffix}.csv)"
-        
-        content += f"| **Option {i}** | {config['num_age_groups']} | {config['total_teams']} | {config['total_matches']} | {dashboard} | {grid} | {csv_link} |\n"
-    
+        content += f"| **Option {i}** | {config['num_age_groups']} | {config['total_teams']} | {config['total_players']} | {config['total_matches']} | {dashboard} |\n"
     content += "\n## Detailed Option Summaries\n\n"
-    
     for i, config in enumerate(configs, 1):
         content += f"### Option {i}\n"
         content += f"- **{config['num_age_groups']}** Age Groups\n"
         content += f"- **{config['total_teams']}** Total Teams\n"
+        content += f"- **{config['total_players']}** Total Players\n"
         content += f"- **{config['total_matches']}** Total Matches\n"
         content += f"- **{config['used_pitches']}** Pitches (No spare pitches)\n\n"
-        
         content += "#### Breakdown:\n"
-        if config['breakdown'][6] > 0: content += f"- {config['breakdown'][6]} brackets of 6 Teams (1 pitch each)\n"
-        if config['breakdown'][8] > 0: content += f"- {config['breakdown'][8]} brackets of 8 Teams (2 pitches each)\n"
-        if config['breakdown'][10] > 0: content += f"- {config['breakdown'][10]} brackets of 10 Teams (3 pitches each)\n"
+        if config['breakdown'][6] > 0: content += f"- {config['breakdown'][6]} brackets of 6 Teams (1 pitch each | 5 Players per Team)\n"
+        if config['breakdown'][8] > 0: content += f"- {config['breakdown'][8]} brackets of 8 Teams (2 pitches each | 8 Players per Team)\n"
+        if config['breakdown'][10] > 0: content += f"- {config['breakdown'][10]} brackets of 10 Teams (3 pitches each | 9 Players per Team)\n"
         content += "\n---\n\n"
-
-    with open(filename, 'w') as f:
-        f.write(content)
+    with open(filename, 'w') as f: f.write(content)
 
 if __name__ == "__main__":
-    
     PITCH_COUNT = 14
     configs = discover_configurations(total_pitches=PITCH_COUNT)
-    print_configurations(total_pitches=PITCH_COUNT)
-    
-    if not configs:
-        print("No valid configurations discovered.")
-        exit(1)
+    if not configs: exit(1)
 
-    # Create an output directory for options if it doesn't exist
     output_dir = "options_output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
         
-    print(f"Generating files for {len(configs)} options in '{output_dir}/'...")
-    
-    # 1. Generate standard options
     for i, selected_config in enumerate(configs, 1):
         option_label = f"Option {i}"
         file_suffix = f"option_{i}"
         age_groups_config = map_config_to_ages(selected_config)
-        
-        MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE']
+        MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND']
         TEAM_ROSTERS = {group['age']: MASTER_TEAM_LIST[:group['teams']] for group in age_groups_config}
-        
         allocation_data = allocate_tournament(option_label, age_groups_config)
         master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
-        
         export_to_csv(master_schedule, os.path.join(output_dir, f"master_schedule_{file_suffix}.csv"))
-        generate_summary_dashboard(
-            allocation_data['allocations'], 
-            master_schedule, 
-            allocation_data['title'], 
-            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"),
-            config_info=selected_config,
-            index_link="../index.html" # Link back to the main HTML index
-        )
-        generate_detailed_html_grid(
-            master_schedule, 
-            allocation_data['allocations'], 
-            os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html")
-        )
-        
-        if i == 1:
-            export_to_csv(master_schedule, "master_schedule.csv")
-            generate_summary_dashboard(
-                allocation_data['allocations'], 
-                master_schedule, 
-                allocation_data['title'], 
-                "summary_dashboard.html",
-                config_info=selected_config,
-                index_link="index.html"
-            )
-            generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
+        generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"), config_info=selected_config, index_link="../index.html")
+        generate_detailed_html_grid(master_schedule, allocation_data['allocations'], os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html"))
 
-    # 2. Generate the SPECIFIC FINAL PROPOSAL
     print("\nGenerating FINAL RECOMMENDED PROPOSAL...")
+    # Optimal Mix: U6/U7 Boys (6), U7/U8 Girls (6), 6 others with 8 teams each
     final_proposal_config = [
-        {'age': 'U6/U7 Boys', 'teams': 6},
-        {'age': 'U8 Boys', 'teams': 6},
-        {'age': 'U9 Mixed', 'teams': 8},
-        {'age': 'U10 Mixed', 'teams': 10},
-        {'age': 'U11 Mixed', 'teams': 10},
-        {'age': 'U12 Mixed', 'teams': 8},
-        {'age': 'U13 Mixed', 'teams': 6},
-        {'age': 'U7/U8 Girls', 'teams': 6},
+        {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5},
+        {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 9},
+        {'age': 'U9 Mixed', 'teams': 8, 'players_per_team': 9},
+        {'age': 'U10 Mixed', 'teams': 8, 'players_per_team': 9},
+        {'age': 'U11 Mixed', 'teams': 8, 'players_per_team': 8},
+        {'age': 'U12 Mixed', 'teams': 8, 'players_per_team': 8},
+        {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 7},
+        {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5},
     ]
     
-    # Summary info for the final proposal
     final_info = {
         'num_age_groups': len(final_proposal_config),
         'total_teams': sum(g['teams'] for g in final_proposal_config),
-        'total_matches': 206,
+        'total_players': sum(g['teams'] * g['players_per_team'] for g in final_proposal_config),
+        'total_matches': sum(get_requirements(g['teams'])[0] for g in final_proposal_config),
         'used_pitches': 14,
         'spare_pitches': 0
     }
 
-    MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE']
+    MASTER_TEAM_LIST = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10']
     TEAM_ROSTERS_FINAL = {group['age']: MASTER_TEAM_LIST[:group['teams']] for group in final_proposal_config}
-    
     allocation_final = allocate_tournament("Final Recommended Proposal", final_proposal_config)
     schedule_final = generate_master_schedule(allocation_final['allocations'], TEAM_ROSTERS_FINAL)
-    
     export_to_csv(schedule_final, "master_schedule_final.csv")
-    generate_summary_dashboard(
-        allocation_final['allocations'], 
-        schedule_final, 
-        "Final Recommended Proposal", 
-        "index.html", 
-        config_info=final_info,
-        index_link=None, # Already the index
-        discovery_configs=configs # Include the list of other options here
-    )
+    generate_summary_dashboard(allocation_final['allocations'], schedule_final, "Final Recommended Proposal", "index.html", config_info=final_info, index_link=None, discovery_configs=configs)
     generate_detailed_html_grid(schedule_final, allocation_final['allocations'], "master_schedule_grid_final.html")
-    
-    # 5. Generate README Index
     generate_readme_index(configs, output_dir, final_info=final_info)
-    
     print(f"\n--- Process Complete! Final Proposal and {len(configs)} options generated. ---")
