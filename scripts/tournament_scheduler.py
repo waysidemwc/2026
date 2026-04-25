@@ -170,7 +170,7 @@ def discover_configurations(total_pitches):
     for num_age_groups in range(4, 16):
         for combo in itertools.combinations_with_replacement(blocks, num_age_groups):
             used_pitches = sum(item['pitches'] for item in combo)
-            if used_pitches <= total_pitches:
+            if used_pitches == total_pitches:
                 total_teams = sum(item['teams'] for item in combo)
                 total_matches = sum(item['matches'] for item in combo)
                 
@@ -183,7 +183,7 @@ def discover_configurations(total_pitches):
                     'total_teams': total_teams,
                     'total_matches': total_matches,
                     'used_pitches': used_pitches,
-                    'spare_pitches': total_pitches - used_pitches,
+                    'spare_pitches': 0, # Always 0 now
                     'breakdown': counts
                 }
                 
