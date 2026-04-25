@@ -371,7 +371,7 @@ def export_to_csv(master_schedule, filename="master_schedule.csv"):
         writer.writeheader()
         writer.writerows(sorted_schedule)
 
-def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html", config_info=None, index_link=None):
+def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html", config_info=None, index_link=None, discovery_configs=None):
     """Generates the high-level dashboard with Zone Map, Breakdown, and Abstract Schedule Grid."""
     print(f"Exporting Summary Dashboard: {filename}...")
     
@@ -399,7 +399,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         pitch_schedule[p_id][match['slot']] = match['age_group']
 
     # 4. Build HTML Structure
-    nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; View All Configuration Options</a></div>' if index_link else ""
+    nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; Back to Recommended Proposal Index</a></div>' if index_link else ""
     
     css = """
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
@@ -428,6 +428,10 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .cell-u14, .cell-u15, .cell-u16, .cell-u17, .cell-u18, .cell-u19 { background-color: #fadbd8; color: #943126; }
         .cell-break { background-color: #f2f3f4; color: #a6acaf; font-style: italic;}
         .age-label { font-size: 0.8em; }
+        .discovery-list { margin-top: 50px; border-top: 4px solid #eee; padding-top: 30px; }
+        .discovery-table { font-size: 0.85em; }
+        .discovery-table a { color: #3498db; text-decoration: none; font-weight: bold; }
+        .discovery-table tr:hover { background-color: #f9f9f9; }
     """
     
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{title}</title><style>{css}</style></head>
@@ -473,7 +477,20 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                 html += '<td class="cell-break">Break</td>'
         html += "</tr>"
 
-    html += "</tbody></table></div></div></body></html>"
+    html += "</tbody></table></div>"
+    
+    # Add Discovery Options List if present
+    if discovery_configs:
+        html += '<div class="discovery-list"><hr><h2>Explore Other Discovery Options</h2><div class="table-container"><table class="discovery-table"><thead><tr><th>Option</th><th>Age Groups</th><th>Total Teams</th><th>Total Matches</th><th>Pitches</th><th>Dashboard</th><th>Matchup Grid</th><th>Data</th></tr></thead><tbody>'
+        for i, config in enumerate(discovery_configs, 1):
+            suffix = f"option_{i}"
+            db_link = f"options_output/summary_dashboard_{suffix}.html"
+            grid_link = f"options_output/master_schedule_grid_{suffix}.html"
+            csv_link = f"options_output/master_schedule_{suffix}.csv"
+            html += f"<tr><td><strong>Option {i}</strong></td><td>{config['num_age_groups']}</td><td>{config['total_teams']}</td><td>{config['total_matches']}</td><td>14</td><td><a href='{db_link}'>View Dashboard</a></td><td><a href='{grid_link}'>View Grid</a></td><td><a href='{csv_link}'>Download CSV</a></td></tr>"
+        html += '</tbody></table></div></div>'
+
+    html += "</div></body></html>"
     
     with open(filename, 'w') as f:
         f.write(html)
@@ -621,7 +638,7 @@ if __name__ == "__main__":
             allocation_data['title'], 
             os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"),
             config_info=selected_config,
-            index_link="../README.md"
+            index_link="../index.html" # Link back to the main HTML index
         )
         generate_detailed_html_grid(
             master_schedule, 
@@ -629,8 +646,6 @@ if __name__ == "__main__":
             os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html")
         )
         
-        # Also maintain "latest" symlink or copy for convenience if needed, 
-        # or just keep the primary ones as Option 1
         if i == 1:
             export_to_csv(master_schedule, "master_schedule.csv")
             generate_summary_dashboard(
@@ -639,7 +654,7 @@ if __name__ == "__main__":
                 allocation_data['title'], 
                 "summary_dashboard.html",
                 config_info=selected_config,
-                index_link="README.md"
+                index_link="index.html"
             )
             generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
 
@@ -678,7 +693,8 @@ if __name__ == "__main__":
         "Final Recommended Proposal", 
         "index.html", 
         config_info=final_info,
-        index_link="README.md"
+        index_link=None, # Already the index
+        discovery_configs=configs # Include the list of other options here
     )
     generate_detailed_html_grid(schedule_final, allocation_final['allocations'], "master_schedule_grid_final.html")
     
