@@ -142,7 +142,8 @@ def schedule_8_teams(teams):
     """8 Teams, 2 Pitches, 28 Matches. Optimized for rest."""
     rounds = generate_round_robin(teams)
     all_matches = [m for r in rounds for m in r]
-    physical_slots = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]
+    # Use all 15 available slots to maximize spacing and eliminate back-to-back games
+    physical_slots = list(range(1, 16))
     return optimize_spacing(teams, all_matches, num_pitches=2, physical_slots=physical_slots)
 
 def schedule_10_teams(teams):
