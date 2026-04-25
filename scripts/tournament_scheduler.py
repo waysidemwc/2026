@@ -251,21 +251,65 @@ def get_requirements(team_count):
 
 def allocate_tournament(option_name, age_groups):
     print(f"Allocating Pitches for {option_name}...")
-    available_pitches = PITCH_INVENTORY.copy()
-    allocations = []
     
-    for group in age_groups:
-        matches, pitches_needed = get_requirements(group['teams'])
-        assigned = [available_pitches.pop(0) for _ in range(pitches_needed)]
-        allocations.append({
-            'age_group': group['age'],
-            'teams': group['teams'],
-            'matches': matches,
-            'pitches_req': pitches_needed,
-            'assigned_pitches': assigned
-        })
+    # 1. Initialize Zone-based Inventory
+    zone_inventory = {
+        'JP1': [p for p in PITCH_INVENTORY if p['zone'] == 'JP1'],
+        'JP2': [p for p in PITCH_INVENTORY if p['zone'] == 'JP2'],
+        'JP3': [p for p in PITCH_INVENTORY if p['zone'] == 'JP3'],
+        'JP4': [p for p in PITCH_INVENTORY if p['zone'] == 'JP4'],
+    }
+    
+    # 2. Sort age groups by size (largest first) to handle 3-pitch groups early
+    sorted_groups = sorted(age_groups, key=lambda x: get_requirements(x['teams'])[1], reverse=True)
+    
+    allocations_map = {}
+    
+    for group in sorted_groups:
+        age = group['age']
+        teams = group['teams']
+        matches, pitches_needed = get_requirements(teams)
         
-    return {'title': option_name, 'allocations': allocations}
+        placed = False
+        # Try to find a zone with enough capacity to keep the group unified
+        # We check zones JP1, JP2, JP3, JP4 in order
+        for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
+            if len(zone_inventory[z_name]) >= pitches_needed:
+                assigned = [zone_inventory[z_name].pop(0) for _ in range(pitches_needed)]
+                allocations_map[age] = {
+                    'age_group': age,
+                    'teams': teams,
+                    'matches': matches,
+                    'pitches_req': pitches_needed,
+                    'assigned_pitches': assigned
+                }
+                placed = True
+                break
+        
+        if not placed:
+            # Fallback: Scrape remaining pitches from any zone (should rarely happen with 14 pitches)
+            assigned = []
+            for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
+                while zone_inventory[z_name] and len(assigned) < pitches_needed:
+                    assigned.append(zone_inventory[z_name].pop(0))
+            
+            if len(assigned) == pitches_needed:
+                allocations_map[age] = {
+                    'age_group': age,
+                    'teams': teams,
+                    'matches': matches,
+                    'pitches_req': pitches_needed,
+                    'assigned_pitches': assigned
+                }
+            else:
+                raise ValueError(f"Critically failed to allocate {pitches_needed} pitches for {age}")
+
+    # 3. Restore original age group order for the final output
+    final_allocations = []
+    for g in age_groups:
+        final_allocations.append(allocations_map[g['age']])
+        
+    return {'title': option_name, 'allocations': final_allocations}
 
 
 # ==========================================
