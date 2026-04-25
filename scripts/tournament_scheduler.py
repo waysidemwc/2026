@@ -371,7 +371,7 @@ def export_to_csv(master_schedule, filename="master_schedule.csv"):
         writer.writeheader()
         writer.writerows(sorted_schedule)
 
-def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html", config_info=None):
+def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html", config_info=None, index_link=None):
     """Generates the high-level dashboard with Zone Map, Breakdown, and Abstract Schedule Grid."""
     print(f"Exporting Summary Dashboard: {filename}...")
     
@@ -399,9 +399,11 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         pitch_schedule[p_id][match['slot']] = match['age_group']
 
     # 4. Build HTML Structure
+    nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; View All Configuration Options</a></div>' if index_link else ""
+    
     css = """
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-        h1, h2 { text-align: center; color: #2c3e50; }
+        h1, h2 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .summary-bar { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
         .summary-item { text-align: center; }
@@ -425,10 +427,11 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .cell-u12, .cell-u13 { background-color: #fdebd0; color: #b9770e; }
         .cell-u14, .cell-u15, .cell-u16, .cell-u17, .cell-u18, .cell-u19 { background-color: #fadbd8; color: #943126; }
         .cell-break { background-color: #f2f3f4; color: #a6acaf; font-style: italic;}
+        .age-label { font-size: 0.8em; }
     """
     
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{title}</title><style>{css}</style></head>
-    <body><div class="container"><h1>Tournament Configuration: {title}</h1>
+    <body><div class="container">{nav_html}<h1>Tournament Configuration: {title}</h1>
     <div class="summary-bar">
         <div class="summary-item"><span class="val">{len(allocations)}</span><span class="lbl">Age Groups</span></div>
         <div class="summary-item"><span class="val">{total_teams}</span><span class="lbl">Total Teams</span></div>
@@ -441,7 +444,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     for z in sorted(zones.keys()):
         html += f'<div class="zone {z.lower()}"><h3>{z}</h3><div class="pitch-grid">'
         for p in zones[z]:
-            html += f'<div class="pitch-card">{p["name"]}<br>{p["age"]}</div>'
+            html += f'<div class="pitch-card">{p["name"]}<br><span class="age-label">{p["age"]}</span></div>'
         html += '</div></div>'
     html += '</div><hr><h2>2. Age Group Breakdown</h2><div class="table-container"><table><thead><tr><th>Age Group</th><th>Teams</th><th>Total Matches</th><th>Pitches Req.</th><th>Dedicated Pitches</th><th>Zone</th></tr></thead><tbody>'
     
@@ -464,7 +467,8 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         for slot in range(1, 17):
             age = pitch_schedule.get(p['id'], {}).get(slot)
             if age:
-                html += f'<td class="cell-{age.lower()}">{age}</td>'
+                age_clean = age.split(' ')[0].lower() # Handle groups like 'U11 Mixed'
+                html += f'<td class="cell-{age_clean}">{age}</td>'
             else:
                 html += '<td class="cell-break">Break</td>'
         html += "</tr>"
@@ -611,12 +615,32 @@ if __name__ == "__main__":
         master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
         
         export_to_csv(master_schedule, os.path.join(output_dir, f"master_schedule_{file_suffix}.csv"))
-        generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"), config_info=selected_config)
-        generate_detailed_html_grid(master_schedule, allocation_data['allocations'], os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html"))
+        generate_summary_dashboard(
+            allocation_data['allocations'], 
+            master_schedule, 
+            allocation_data['title'], 
+            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"),
+            config_info=selected_config,
+            index_link="../README.md"
+        )
+        generate_detailed_html_grid(
+            master_schedule, 
+            allocation_data['allocations'], 
+            os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html")
+        )
         
+        # Also maintain "latest" symlink or copy for convenience if needed, 
+        # or just keep the primary ones as Option 1
         if i == 1:
             export_to_csv(master_schedule, "master_schedule.csv")
-            generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html", config_info=selected_config)
+            generate_summary_dashboard(
+                allocation_data['allocations'], 
+                master_schedule, 
+                allocation_data['title'], 
+                "summary_dashboard.html",
+                config_info=selected_config,
+                index_link="README.md"
+            )
             generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
 
     # 2. Generate the SPECIFIC FINAL PROPOSAL
@@ -648,7 +672,14 @@ if __name__ == "__main__":
     schedule_final = generate_master_schedule(allocation_final['allocations'], TEAM_ROSTERS_FINAL)
     
     export_to_csv(schedule_final, "master_schedule_final.csv")
-    generate_summary_dashboard(allocation_final['allocations'], schedule_final, "Final Recommended Proposal", "index.html", config_info=final_info)
+    generate_summary_dashboard(
+        allocation_final['allocations'], 
+        schedule_final, 
+        "Final Recommended Proposal", 
+        "index.html", 
+        config_info=final_info,
+        index_link="README.md"
+    )
     generate_detailed_html_grid(schedule_final, allocation_final['allocations'], "master_schedule_grid_final.html")
     
     # 5. Generate README Index
