@@ -1,5 +1,23 @@
 # Wayside Mini World Cup 2026 - Tournament Configurations
 
+## 🏆 RECOMMENDED PROPOSAL
+
+This configuration is tailored to the specific age group and team count requirements provided.
+
+- **Dashboard:** [View Interactive Dashboard](index.html)
+- **Matchup Grid:** [View Detailed Matchup Grid](master_schedule_grid_final.html)
+- **Data:** [Download CSV Schedule](master_schedule_final.csv)
+
+### Proposal Summary:
+- **8** Age Groups
+- **60** Total Teams
+- **206** Total Matches
+- **14** Pitches (No spare pitches)
+
+---
+
+## Discovery Options
+
 This repository contains various tournament configurations for 14 pitches. Each option represents a different way to balance age groups, team counts, and match volume.
 
 | Option | Age Groups | Total Teams | Total Matches | Dashboards | Grids | Data |

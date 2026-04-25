@@ -487,11 +487,26 @@ def map_config_to_ages(config, start_age=6):
             current_age += 1
     return age_groups
 
-def generate_readme_index(configs, output_dir, filename="README.md"):
+def generate_readme_index(configs, output_dir, filename="README.md", final_info=None):
     """Generates a README.md index linking to all generated options."""
     print(f"Generating README Index: {filename}...")
     
     content = "# Wayside Mini World Cup 2026 - Tournament Configurations\n\n"
+    
+    if final_info:
+        content += "## 🏆 RECOMMENDED PROPOSAL\n\n"
+        content += "This configuration is tailored to the specific age group and team count requirements provided.\n\n"
+        content += f"- **Dashboard:** [View Interactive Dashboard](index.html)\n"
+        content += f"- **Matchup Grid:** [View Detailed Matchup Grid](master_schedule_grid_final.html)\n"
+        content += f"- **Data:** [Download CSV Schedule](master_schedule_final.csv)\n\n"
+        content += "### Proposal Summary:\n"
+        content += f"- **{final_info['num_age_groups']}** Age Groups\n"
+        content += f"- **{final_info['total_teams']}** Total Teams\n"
+        content += f"- **{final_info['total_matches']}** Total Matches\n"
+        content += f"- **{final_info['used_pitches']}** Pitches (No spare pitches)\n\n"
+        content += "---\n\n"
+
+    content += "## Discovery Options\n\n"
     content += "This repository contains various tournament configurations for 14 pitches. Each option represents a different way to balance age groups, team counts, and match volume.\n\n"
     content += "| Option | Age Groups | Total Teams | Total Matches | Dashboards | Grids | Data |\n"
     content += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
@@ -576,13 +591,11 @@ if __name__ == "__main__":
     # Summary info for the final proposal
     final_info = {
         'num_age_groups': len(final_proposal_config),
-        'total_teams': sum(g['teams'] for group in final_proposal_config for g in [group]), # logic fix
+        'total_teams': sum(g['teams'] for g in final_proposal_config),
         'total_matches': 206,
         'used_pitches': 14,
         'spare_pitches': 0
     }
-    # Fix total teams calculation
-    final_info['total_teams'] = sum(g['teams'] for g in final_proposal_config)
 
     MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE']
     TEAM_ROSTERS_FINAL = {group['age']: MASTER_TEAM_LIST[:group['teams']] for group in final_proposal_config}
@@ -595,6 +608,6 @@ if __name__ == "__main__":
     generate_detailed_html_grid(schedule_final, allocation_final['allocations'], "master_schedule_grid_final.html")
     
     # 5. Generate README Index
-    generate_readme_index(configs, output_dir)
+    generate_readme_index(configs, output_dir, final_info=final_info)
     
     print(f"\n--- Process Complete! Final Proposal and {len(configs)} options generated. ---")
