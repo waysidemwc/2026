@@ -52,7 +52,7 @@ def schedule_6_teams(teams):
 def optimize_spacing(teams, matches, num_pitches, physical_slots):
     """Uses a Monte-Carlo Greedy approach to find the schedule with the best possible rest spacing."""
     best_schedule = []
-    best_overall_score = -9999
+    best_overall_score = -999999
     
     # Fallback schedule (sequential) in case the optimizer hits a dead end
     fallback_schedule = []
@@ -63,7 +63,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1': matches[m_idx][0], 't2': matches[m_idx][1]})
                 m_idx += 1
                 
-    for _ in range(200): # Run 200 variations
+    for _ in range(500): # Increased to 500 iterations for better exploration
         shuffled_matches = matches[:]
         random.shuffle(shuffled_matches)
         remaining = shuffled_matches[:]
@@ -72,6 +72,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
         
         min_rest_in_schedule = 999
         total_rest_score = 0
+        back_to_back_count = 0
         
         for slot in physical_slots:
             slot_matches = []
@@ -104,9 +105,11 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                     if 0 < d1 < 50: 
                         min_rest_in_schedule = min(min_rest_in_schedule, d1)
                         total_rest_score += d1
+                        if d1 == 1: back_to_back_count += 1
                     if 0 < d2 < 50: 
                         min_rest_in_schedule = min(min_rest_in_schedule, d2)
                         total_rest_score += d2
+                        if d2 == 1: back_to_back_count += 1
                         
                     slot_matches.append(best_match)
                     teams_in_slot.update(best_match)
@@ -125,8 +128,11 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 })
                 
         if not remaining: # If all matches successfully packed without overlaps
-            # Maximize the minimum rest any team gets. Tiebreaker: total aggregate rest.
-            eval_score = (min_rest_in_schedule * 1000) + total_rest_score
+            # SCORING ENGINE:
+            # 1. Heavily penalize back-to-back games (interval=1)
+            # 2. Maximize the minimum rest any team gets. 
+            # 3. Tiebreaker: total aggregate rest.
+            eval_score = (back_to_back_count * -5000) + (min_rest_in_schedule * 1000) + total_rest_score
             
             if eval_score > best_overall_score:
                 best_overall_score = eval_score
