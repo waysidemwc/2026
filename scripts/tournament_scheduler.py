@@ -487,6 +487,41 @@ def map_config_to_ages(config, start_age=6):
             current_age += 1
     return age_groups
 
+def generate_readme_index(configs, output_dir, filename="README.md"):
+    """Generates a README.md index linking to all generated options."""
+    print(f"Generating README Index: {filename}...")
+    
+    content = "# Wayside Mini World Cup 2026 - Tournament Configurations\n\n"
+    content += "This repository contains various tournament configurations for 14 pitches. Each option represents a different way to balance age groups, team counts, and match volume.\n\n"
+    content += "| Option | Age Groups | Total Teams | Total Matches | Dashboards | Grids | Data |\n"
+    content += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
+    
+    for i, config in enumerate(configs, 1):
+        suffix = f"option_{i}"
+        dashboard = f"[Dashboard](options_output/summary_dashboard_{suffix}.html)"
+        grid = f"[Matchup Grid](options_output/master_schedule_grid_{suffix}.html)"
+        csv_link = f"[CSV](options_output/master_schedule_{suffix}.csv)"
+        
+        content += f"| **Option {i}** | {config['num_age_groups']} | {config['total_teams']} | {config['total_matches']} | {dashboard} | {grid} | {csv_link} |\n"
+    
+    content += "\n## Detailed Option Summaries\n\n"
+    
+    for i, config in enumerate(configs, 1):
+        content += f"### Option {i}\n"
+        content += f"- **{config['num_age_groups']}** Age Groups\n"
+        content += f"- **{config['total_teams']}** Total Teams\n"
+        content += f"- **{config['total_matches']}** Total Matches\n"
+        content += f"- **{config['used_pitches']}** Pitches (No spare pitches)\n\n"
+        
+        content += "#### Breakdown:\n"
+        if config['breakdown'][6] > 0: content += f"- {config['breakdown'][6]} brackets of 6 Teams (1 pitch each)\n"
+        if config['breakdown'][8] > 0: content += f"- {config['breakdown'][8]} brackets of 8 Teams (2 pitches each)\n"
+        if config['breakdown'][10] > 0: content += f"- {config['breakdown'][10]} brackets of 10 Teams (3 pitches each)\n"
+        content += "\n---\n\n"
+
+    with open(filename, 'w') as f:
+        f.write(content)
+
 if __name__ == "__main__":
     
     PITCH_COUNT = 14
@@ -553,5 +588,8 @@ if __name__ == "__main__":
                 config_info=selected_config
             )
             generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
+    
+    # 5. Generate README Index
+    generate_readme_index(configs, output_dir)
     
     print(f"\n--- Process Complete! All {len(configs)} options generated in '{output_dir}/'. ---")
