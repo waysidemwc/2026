@@ -539,57 +539,62 @@ if __name__ == "__main__":
         
     print(f"Generating files for {len(configs)} options in '{output_dir}/'...")
     
+    # 1. Generate standard options
     for i, selected_config in enumerate(configs, 1):
         option_label = f"Option {i}"
         file_suffix = f"option_{i}"
-        
-        # 1. Map to Age Groups
         age_groups_config = map_config_to_ages(selected_config)
         
-        # 2. Master Team List Mapper
-        MASTER_TEAM_LIST = [
-            'IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 
-            'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE'
-        ]
+        MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE']
+        TEAM_ROSTERS = {group['age']: MASTER_TEAM_LIST[:group['teams']] for group in age_groups_config}
         
-        # Dynamically build rosters
-        TEAM_ROSTERS = {}
-        for group in age_groups_config:
-            TEAM_ROSTERS[group['age']] = MASTER_TEAM_LIST[:group['teams']]
-        
-        # 3. Run the engines
         allocation_data = allocate_tournament(option_label, age_groups_config)
         master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
         
-        # 4. Export all files with unique names
         export_to_csv(master_schedule, os.path.join(output_dir, f"master_schedule_{file_suffix}.csv"))
-        generate_summary_dashboard(
-            allocation_data['allocations'], 
-            master_schedule, 
-            allocation_data['title'], 
-            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"),
-            config_info=selected_config
-        )
-        generate_detailed_html_grid(
-            master_schedule, 
-            allocation_data['allocations'], 
-            os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html")
-        )
+        generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"), config_info=selected_config)
+        generate_detailed_html_grid(master_schedule, allocation_data['allocations'], os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html"))
         
-        # Also maintain "latest" symlink or copy for convenience if needed, 
-        # or just keep the primary ones as Option 1
         if i == 1:
             export_to_csv(master_schedule, "master_schedule.csv")
-            generate_summary_dashboard(
-                allocation_data['allocations'], 
-                master_schedule, 
-                allocation_data['title'], 
-                "summary_dashboard.html",
-                config_info=selected_config
-            )
+            generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html", config_info=selected_config)
             generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
+
+    # 2. Generate the SPECIFIC FINAL PROPOSAL
+    print("\nGenerating FINAL RECOMMENDED PROPOSAL...")
+    final_proposal_config = [
+        {'age': 'U6/U7 Boys', 'teams': 6},
+        {'age': 'U8 Boys', 'teams': 6},
+        {'age': 'U9 Mixed', 'teams': 8},
+        {'age': 'U10 Mixed', 'teams': 10},
+        {'age': 'U11 Mixed', 'teams': 10},
+        {'age': 'U12 Mixed', 'teams': 8},
+        {'age': 'U13 Mixed', 'teams': 6},
+        {'age': 'U7/U8 Girls', 'teams': 6},
+    ]
+    
+    # Summary info for the final proposal
+    final_info = {
+        'num_age_groups': len(final_proposal_config),
+        'total_teams': sum(g['teams'] for group in final_proposal_config for g in [group]), # logic fix
+        'total_matches': 206,
+        'used_pitches': 14,
+        'spare_pitches': 0
+    }
+    # Fix total teams calculation
+    final_info['total_teams'] = sum(g['teams'] for g in final_proposal_config)
+
+    MASTER_TEAM_LIST = ['IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE']
+    TEAM_ROSTERS_FINAL = {group['age']: MASTER_TEAM_LIST[:group['teams']] for group in final_proposal_config}
+    
+    allocation_final = allocate_tournament("Final Recommended Proposal", final_proposal_config)
+    schedule_final = generate_master_schedule(allocation_final['allocations'], TEAM_ROSTERS_FINAL)
+    
+    export_to_csv(schedule_final, "master_schedule_final.csv")
+    generate_summary_dashboard(allocation_final['allocations'], schedule_final, "Final Recommended Proposal", "index.html", config_info=final_info)
+    generate_detailed_html_grid(schedule_final, allocation_final['allocations'], "master_schedule_grid_final.html")
     
     # 5. Generate README Index
     generate_readme_index(configs, output_dir)
     
-    print(f"\n--- Process Complete! All {len(configs)} options generated in '{output_dir}/'. ---")
+    print(f"\n--- Process Complete! Final Proposal and {len(configs)} options generated. ---")
