@@ -481,7 +481,66 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     
     # Add Discovery Options List if present
     if discovery_configs:
-        html += '<div class="discovery-list"><hr><h2>Explore Other Discovery Options</h2><div class="table-container"><table class="discovery-table"><thead><tr><th>Option</th><th>Age Groups</th><th>Total Teams</th><th>Total Matches</th><th>Pitches</th><th>Dashboard</th><th>Matchup Grid</th><th>Data</th></tr></thead><tbody>'
+        params_html = """
+        <div class="discovery-list">
+            <hr>
+            <h2>Tournament Logic & Parameters</h2>
+            <div style="background: #fdfefe; border: 1px solid #dcdfe0; padding: 20px; border-radius: 8px; margin-bottom: 30px; font-size: 0.95em; line-height: 1.6;">
+                <div style="display: flex; flex-wrap: wrap; gap: 40px;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4 style="margin-top:0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Foundational Constraints</h4>
+                        <ul style="padding-left: 20px;">
+                            <li><strong>14 pitches</strong> (or 13 Pitches + 1 spare)</li>
+                            <li><strong>15 minutes per slot:</strong> 12 min match + 3 min gap</li>
+                            <li><strong>Round Robin:</strong> 4 hours total (Tue/Thu 6:30pm - 8:30pm)</li>
+                            <li><strong>Minimal Movement:</strong> Age groups are ring-fenced to specific dedicated pitches</li>
+                        </ul>
+                    </div>
+                    <div style="flex: 1; min-width: 300px;">
+                        <h4 style="margin-top:0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Capacity Math</h4>
+                        <ul style="padding-left: 20px;">
+                            <li><strong>Total Time:</strong> 240 minutes (16 time slots available)</li>
+                            <li><strong>Pitch Capacity:</strong> Max 16 matches per pitch</li>
+                            <li><strong>Tournament Cap (13 Pitches):</strong> 208 match slots</li>
+                            <li><strong>Tournament Cap (14 Pitches):</strong> 224 match slots</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h4 style="margin-top:20px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">The Optimal Team Blocks</h4>
+                <p>To maximize pitch efficiency while keeping age groups unified, we use these optimized bracket sizes:</p>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; text-align: center;">
+                    <div style="flex: 1; background: #e8f8f5; padding: 10px; border-radius: 5px; border-left: 5px solid #1abc9c;">
+                        <strong>6 Teams</strong><br>15 matches | 1 Pitch<br><small>1 spare slot</small>
+                    </div>
+                    <div style="flex: 1; background: #ebf5fb; padding: 10px; border-radius: 5px; border-left: 5px solid #3498db;">
+                        <strong>8 Teams</strong><br>28 matches | 2 Pitches<br><small>2 spare slots</small>
+                    </div>
+                    <div style="flex: 1; background: #fef9e7; padding: 10px; border-radius: 5px; border-left: 5px solid #f1c40f;">
+                        <strong>10 Teams</strong><br>45 matches | 3 Pitches<br><small>1 spare slot</small>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            <h2>Explore Other Discovery Options</h2>
+            <div class="table-container">
+                <table class="discovery-table">
+                    <thead>
+                        <tr>
+                            <th>Option</th>
+                            <th>Age Groups</th>
+                            <th>Total Teams</th>
+                            <th>Total Matches</th>
+                            <th>Pitches</th>
+                            <th>Dashboard</th>
+                            <th>Matchup Grid</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        html += params_html
         for i, config in enumerate(discovery_configs, 1):
             suffix = f"option_{i}"
             db_link = f"options_output/summary_dashboard_{suffix}.html"
