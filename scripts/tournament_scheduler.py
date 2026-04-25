@@ -129,7 +129,10 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 })
                 
         if not remaining:
-            # SCORING ENGINE
+            # SCORING ENGINE:
+            # 1. Heavily penalize back-to-back games (interval=1)
+            # 2. Maximize the minimum rest any team gets. 
+            # 3. Tiebreaker: total aggregate rest.
             eval_score = (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
             
             if eval_score > best_overall_score:
@@ -196,7 +199,7 @@ def print_configurations(total_pitches):
         print(f"Option {i}: {config['num_age_groups']} Age Groups")
         print(f"  TOTAL:")
         print(f"  - {config['total_teams']} Teams")
-        print(f"  - {config['total_players']} Players")
+        print(f"  - {config['total_players']} Players (approx)")
         print(f"  - {config['total_matches']} Matches")
         print("-" * 40)
 
@@ -223,9 +226,9 @@ PITCH_INVENTORY = [
 
 TIME_MAP = {
     1: "Tue 6:30-6:45", 2: "Tue 6:45-7:00", 3: "Tue 7:00-7:15", 4: "Tue 7:15-7:30",
-    5: "Tue 7:30-7:45", 6: "Tue 7:45-8:00", 7: "Tue 8:00-8:15", 8: "Tue 8:15-8:30",
-    9: "Thu 6:30-6:45", 10: "Thu 6:45-7:00", 11: "Thu 7:00-7:15", 12: "Thu 7:15-7:30",
-    13: "Thu 7:30-7:45", 14: "Thu 7:45-8:00", 15: "Thu 8:00-8:15"
+    5: "Tue 7:30-7:45", 6: "Tue 7:45-8:00", 7: "Tue 8:00-8:15",
+    8: "Thu 6:30-6:45", 9: "Thu 6:45-7:00", 10: "Thu 7:00-7:15", 11: "Thu 7:15-7:30",
+    12: "Thu 7:30-7:45", 13: "Thu 7:45-8:00", 14: "Thu 8:00-8:15", 15: "Thu 8:15-8:30"
 }
 
 def get_requirements(team_count):
@@ -457,17 +460,16 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                         <ul style="padding-left: 20px;">
                             <li><strong>14 pitches</strong> (or 13 Pitches + 1 spare)</li>
                             <li><strong>15 minutes per slot:</strong> 12 min match + 3 min gap</li>
-                            <li><strong>Round Robin:</strong> 3.75 hours total (Tue/Thu)</li>
+                            <li><strong>Session Timing:</strong> both Tue and Thu finish at 8:15 PM</li>
                             <li><strong>Minimal Movement:</strong> Age groups are ring-fenced to specific dedicated pitches</li>
                         </ul>
                     </div>
                     <div style="flex: 1; min-width: 300px;">
                         <h4 style="margin-top:0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Capacity Math</h4>
                         <ul style="padding-left: 20px;">
-                            <li><strong>Total Time:</strong> 225 minutes (15 time slots available)</li>
-                            <li><strong>Pitch Capacity:</strong> Max 15 matches per pitch</li>
-                            <li><strong>Tournament Cap (13 Pitches):</strong> 195 match slots</li>
-                            <li><strong>Tournament Cap (14 Pitches):</strong> 210 match slots</li>
+                            <li><strong>Total Time:</strong> 1 hour 45 mins per night (7 core slots per night)</li>
+                            <li><strong>Pitch Capacity:</strong> 14 core matches (plus S15 overrun if needed)</li>
+                            <li><strong>Tournament Cap (14 Pitches):</strong> 196 core match slots</li>
                         </ul>
                     </div>
                 </div>
@@ -557,8 +559,6 @@ if __name__ == "__main__":
         master = generate_master_schedule(alloc['allocations'], rosters)
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
 
-    print("\nGenerating FINAL RECOMMENDED PROPOSAL...")
-    # Optimal Mix: U6/U7 Boys (6), U7/U8 Girls (6), 6 others with 8 teams each
     final_proposal = [
         {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5},
         {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8},
