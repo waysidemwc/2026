@@ -11,7 +11,7 @@ This configuration is tailored to the specific age group and team count requirem
 ### Proposal Summary:
 - **8** Age Groups
 - **60** Total Teams
-- **460** Total Players
+- **444** Total Players
 - **198** Total Matches
 - **14** Pitches (No spare pitches)
 

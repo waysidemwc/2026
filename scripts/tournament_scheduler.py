@@ -655,12 +655,12 @@ if __name__ == "__main__":
     # Optimal Mix: U6/U7 Boys (6), U7/U8 Girls (6), 6 others with 8 teams each
     final_proposal_config = [
         {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5},
-        {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 9},
-        {'age': 'U9 Mixed', 'teams': 8, 'players_per_team': 9},
-        {'age': 'U10 Mixed', 'teams': 8, 'players_per_team': 9},
+        {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8},
+        {'age': 'U9 Mixed', 'teams': 8, 'players_per_team': 8},
+        {'age': 'U10 Mixed', 'teams': 8, 'players_per_team': 8},
         {'age': 'U11 Mixed', 'teams': 8, 'players_per_team': 8},
         {'age': 'U12 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 7},
+        {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 8},
         {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5},
     ]
     
