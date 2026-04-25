@@ -408,15 +408,15 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     for a in allocations:
         z = a['assigned_pitches'][0]['zone']
         matches_per_team = a['teams'] - 1
-        play_time_pct = (matches_per_team / 16) * 100
+        play_time_pct = (matches_per_team / 15) * 100
         html += f"<tr><td><strong>{a['age_group']}</strong></td><td>{a['teams']} Teams</td><td>{a.get('players_per_team', 'N/A')}</td><td>{a.get('total_players', 'N/A')}</td><td>{matches_per_team}</td><td>{play_time_pct:.1f}%</td><td>{a['matches']}</td><td>{a['pitches_req']}</td><td><span class='{z.lower()}'>{z}</span></td></tr>"
     
     html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule</h2><div class="table-container"><table><thead><tr><th>Pitch</th>'
-    for i in range(1, 17): html += f"<th>S{i}</th>"
+    for i in range(1, 16): html += f"<th>S{i}</th>"
     html += '</tr></thead><tbody>'
     for p in PITCH_INVENTORY:
         html += f"<tr><td><strong>{p['name']}</strong></td>"
-        for s in range(1, 17):
+        for s in range(1, 16):
             age = pitch_schedule[p['id']].get(s)
             cls = f"cell-{age.split(' ')[0].lower()}" if age else ""
             html += f'<td class="{cls}">{age if age else "-"}</td>'
@@ -441,17 +441,17 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                         <ul style="padding-left: 20px;">
                             <li><strong>14 pitches</strong> (or 13 Pitches + 1 spare)</li>
                             <li><strong>15 minutes per slot:</strong> 12 min match + 3 min gap</li>
-                            <li><strong>Round Robin:</strong> 4 hours total (Tue/Thu 6:30pm - 8:30pm)</li>
+                            <li><strong>Round Robin:</strong> 3.75 hours total (Tue/Thu)</li>
                             <li><strong>Minimal Movement:</strong> Age groups are ring-fenced to specific dedicated pitches</li>
                         </ul>
                     </div>
                     <div style="flex: 1; min-width: 300px;">
                         <h4 style="margin-top:0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Capacity Math</h4>
                         <ul style="padding-left: 20px;">
-                            <li><strong>Total Time:</strong> 240 minutes (16 time slots available)</li>
-                            <li><strong>Pitch Capacity:</strong> Max 16 matches per pitch</li>
-                            <li><strong>Tournament Cap (13 Pitches):</strong> 208 match slots</li>
-                            <li><strong>Tournament Cap (14 Pitches):</strong> 224 match slots</li>
+                            <li><strong>Total Time:</strong> 225 minutes (15 time slots available)</li>
+                            <li><strong>Pitch Capacity:</strong> Max 15 matches per pitch</li>
+                            <li><strong>Tournament Cap (13 Pitches):</strong> 195 match slots</li>
+                            <li><strong>Tournament Cap (14 Pitches):</strong> 210 match slots</li>
                         </ul>
                     </div>
                 </div>
