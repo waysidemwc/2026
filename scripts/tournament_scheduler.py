@@ -443,19 +443,39 @@ def generate_detailed_html_grid(master_schedule, allocations, filename="master_s
 # ==========================================
 # 6. EXECUTION & TEAM REGISTRY
 # ==========================================
+def map_config_to_ages(config, start_age=6):
+    """Maps a configuration breakdown to a list of age groups with team counts."""
+    age_groups = []
+    current_age = start_age
+    # Process 6, 8, then 10 to keep ages somewhat ordered by bracket size
+    for teams in [6, 8, 10]:
+        count = config['breakdown'][teams]
+        for _ in range(count):
+            age_groups.append({'age': f'U{current_age}', 'teams': teams})
+            current_age += 1
+    return age_groups
+
 if __name__ == "__main__":
     
-    print_configurations(total_pitches=14)
+    PITCH_COUNT = 14
+    configs = discover_configurations(total_pitches=PITCH_COUNT)
+    print_configurations(total_pitches=PITCH_COUNT)
     
-    # 1. Define Option 1 Breakdown
-    option_1_config = [
-        {'age': 'U6', 'teams': 6}, {'age': 'U7', 'teams': 6},
-        {'age': 'U8', 'teams': 6}, {'age': 'U9', 'teams': 6},
-        {'age': 'U10', 'teams': 8}, {'age': 'U11', 'teams': 8},
-        {'age': 'U12', 'teams': 10}, {'age': 'U13', 'teams': 10},
-    ]
+    # 1. Select the first discovered configuration (Option 1)
+    if not configs:
+        print("No valid configurations discovered.")
+        exit(1)
+        
+    selected_idx = 0
+    selected_config = configs[selected_idx]
+    option_label = f"Option {selected_idx + 1}"
     
-    # 2. Master Team List Mapper
+    print(f"Using {option_label} for file generation...")
+    
+    # 2. Map to Age Groups
+    age_groups_config = map_config_to_ages(selected_config)
+    
+    # 3. Master Team List Mapper
     MASTER_TEAM_LIST = [
         'IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 
         'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE'
@@ -463,14 +483,14 @@ if __name__ == "__main__":
     
     # Dynamically build rosters
     TEAM_ROSTERS = {}
-    for group in option_1_config:
+    for group in age_groups_config:
         TEAM_ROSTERS[group['age']] = MASTER_TEAM_LIST[:group['teams']]
     
-    # 3. Run the engines
-    allocation_data = allocate_tournament("Option 1", option_1_config)
+    # 4. Run the engines
+    allocation_data = allocate_tournament(option_label, age_groups_config)
     master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
     
-    # 4. Export all files
+    # 5. Export all files
     export_to_csv(master_schedule, "master_schedule.csv")
     generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html")
     generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
