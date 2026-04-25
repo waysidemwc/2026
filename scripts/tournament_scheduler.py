@@ -53,7 +53,7 @@ def schedule_6_teams(teams):
 def optimize_spacing(teams, matches, num_pitches, physical_slots):
     """Uses a Monte-Carlo Greedy approach to find the schedule with the best possible rest spacing."""
     best_schedule = []
-    best_overall_score = -999999
+    best_overall_score = -9999999
     
     # Fallback schedule (sequential) in case the optimizer hits a dead end
     fallback_schedule = []
@@ -64,7 +64,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1': matches[m_idx][0], 't2': matches[m_idx][1]})
                 m_idx += 1
                 
-    for _ in range(500): # Run 500 variations
+    for _ in range(1000): # Run 1000 variations
         shuffled_matches = matches[:]
         random.shuffle(shuffled_matches)
         remaining = shuffled_matches[:]
@@ -81,7 +81,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
             
             while len(slot_matches) < num_pitches and remaining:
                 best_match = None
-                best_match_score = -9999
+                best_match_score = -99999
                 
                 for m in remaining:
                     t1, t2 = m
@@ -130,7 +130,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 
         if not remaining:
             # SCORING ENGINE
-            eval_score = (back_to_back_count * -5000) + (min_rest_in_schedule * 1000) + total_rest_score
+            eval_score = (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
             
             if eval_score > best_overall_score:
                 best_overall_score = eval_score
@@ -193,13 +193,11 @@ def print_configurations(total_pitches):
     print(f" DISCOVERED CONFIGURATIONS FOR {total_pitches} PITCHES")
     print(f"=======================================================\n")
     for i, config in enumerate(configs, 1):
-        spare_text = "(No spare pitches)"
         print(f"Option {i}: {config['num_age_groups']} Age Groups")
         print(f"  TOTAL:")
         print(f"  - {config['total_teams']} Teams")
-        print(f"  - {config['total_players']} Players (approx)")
+        print(f"  - {config['total_players']} Players")
         print(f"  - {config['total_matches']} Matches")
-        print(f"  - {config['used_pitches']} Pitches {spare_text}")
         print("-" * 40)
 
 # ==========================================
@@ -224,10 +222,10 @@ PITCH_INVENTORY = [
 ]
 
 TIME_MAP = {
-    1: "Tue 18:30", 2: "Tue 18:45", 3: "Tue 19:00", 4: "Tue 19:15",
-    5: "Tue 19:30", 6: "Tue 19:45", 7: "Tue 20:00", 8: "Tue 20:15",
-    9: "Thu 18:30", 10: "Thu 18:45", 11: "Thu 19:00", 12: "Thu 19:15",
-    13: "Thu 19:30", 14: "Thu 19:45", 15: "Thu 20:00", 16: "Thu 20:15"
+    1: "Tue 6:30-6:45", 2: "Tue 6:45-7:00", 3: "Tue 7:00-7:15", 4: "Tue 7:15-7:30",
+    5: "Tue 7:30-7:45", 6: "Tue 7:45-8:00", 7: "Tue 8:00-8:15", 8: "Tue 8:15-8:30",
+    9: "Thu 6:30-6:45", 10: "Thu 6:45-7:00", 11: "Thu 7:00-7:15", 12: "Thu 7:15-7:30",
+    13: "Thu 7:30-7:45", 14: "Thu 7:45-8:00", 15: "Thu 8:00-8:15"
 }
 
 def get_requirements(team_count):
@@ -280,19 +278,21 @@ def allocate_tournament(option_name, age_groups):
 # ==========================================
 
 def perform_validation(master_schedule):
-    """Exhaustive check for clashes and quality metrics."""
+    """Exhaustive check for clashes and quality metrics with per-age breakdown."""
     clashes = []
     slot_pitch_occupancy = defaultdict(list)
     team_slot_occupancy = defaultdict(list)
     team_last_slot = {}
     back_to_back_count = 0
+    age_back_to_back = defaultdict(int)
     min_rest = 99
     
     for m in master_schedule:
         s = m['slot']
         p = m['pitch_id']
-        t1 = f"{m['age_group']}:{m['team1']}"
-        t2 = f"{m['age_group']}:{m['team2']}"
+        age = m['age_group']
+        t1 = f"{age}:{m['team1']}"
+        t2 = f"{age}:{m['team2']}"
         
         if p in slot_pitch_occupancy[s]: clashes.append(f"Pitch Clash: {p} in Slot {s}")
         slot_pitch_occupancy[s].append(p)
@@ -302,7 +302,9 @@ def perform_validation(master_schedule):
             team_slot_occupancy[s].append(team)
             if team in team_last_slot:
                 interval = s - team_last_slot[team]
-                if interval == 1: back_to_back_count += 1
+                if interval == 1: 
+                    back_to_back_count += 1
+                    age_back_to_back[age] += 1
                 min_rest = min(min_rest, interval)
             team_last_slot[team] = s
             
@@ -310,6 +312,7 @@ def perform_validation(master_schedule):
         'status': 'PASS' if not clashes else 'FAIL',
         'clashes': clashes,
         'back_to_back': back_to_back_count,
+        'age_back_to_back': age_back_to_back,
         'min_rest': min_rest if min_rest < 99 else 0
     }
 
@@ -387,6 +390,8 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .status-warn { color: #e67e22; font-weight: bold; }
         .discovery-table { font-size: 0.85em; }
         .discovery-table a { color: #3498db; text-decoration: none; font-weight: bold; }
+        .validation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 15px; }
+        .val-item { background: #f8f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
     """
     
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{title}</title><style>{css}</style></head>
@@ -413,7 +418,9 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         html += f"<tr><td><strong>{a['age_group']}</strong></td><td>{a['teams']} Teams</td><td>{a.get('players_per_team', 'N/A')}</td><td>{a.get('total_players', 'N/A')}</td><td>{matches_per_team}</td><td>{play_time_pct:.1f}%</td><td>{a['matches']}</td><td>{a['pitches_req']}</td><td><span class='{z.lower()}'>{z}</span></td></tr>"
     
     html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule</h2><div class="table-container"><table><thead><tr><th>Pitch</th>'
-    for i in range(1, 16): html += f"<th>S{i}</th>"
+    for i in range(1, 16): 
+        label = TIME_MAP[i].replace(' ', '<br>')
+        html += f"<th>S{i}<br><small>{label}</small></th>"
     html += '</tr></thead><tbody>'
     for p in PITCH_INVENTORY:
         html += f"<tr><td><strong>{p['name']}</strong></td>"
@@ -423,12 +430,20 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
             html += f'<td class="{cls}">{age if age else "-"}</td>'
         html += "</tr>"
     
+    # 4. Validation Report with Age Breakdown
     html += f"""</tbody></table></div><hr><h2>4. Validation & Quality Report</h2>
     <div style="background: #fdfefe; border: 1px solid #dcdfe0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <p><strong>Integrity Status:</strong> <span class="status-pass">{val['status']}</span> (No Clashes, No Double-Bookings)</p>
         <p><strong>Round Robin Status:</strong> <span class="status-pass">PASS</span> (All teams play N-1 games)</p>
         <p><strong>Rest Spacing Quality:</strong> There are <span class="status-warn">{val['back_to_back']}</span> instances of back-to-back games across the entire tournament.</p>
-    </div>"""
+        <div class="validation-grid">"""
+    
+    for a in allocations:
+        count = val['age_back_to_back'].get(a['age_group'], 0)
+        status_cls = "status-pass" if count == 0 else "status-warn"
+        html += f'<div class="val-item"><strong>{a["age_group"]}</strong><br><span class="{status_cls}">{count}</span> consecutive games</div>'
+    
+    html += "</div></div>"
 
     if discovery_configs:
         params_html = """
@@ -501,11 +516,13 @@ def generate_detailed_html_grid(master_schedule, allocations, filename="master_s
     grid_data = defaultdict(dict)
     for m in master_schedule: grid_data[m['pitch_name']][m['slot']] = f"{m['team1']}<br>vs<br>{m['team2']}"
     html = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Matchup Grid</title><style>body{font-family:Arial;margin:20px;}table{width:100%;border-collapse:collapse;text-align:center;}th,td{border:1px solid #ddd;padding:5px;font-size:0.8em;}</style></head><body><h1>Detailed Matchup Grid</h1><table><thead><tr><th>Pitch</th>"""
-    for i in range(1, 17): html += f"<th>S{i}</th>"
+    for i in range(1, 16):
+        label = TIME_MAP[i].replace(' ', '<br>')
+        html += f"<th>S{i}<br><small>{label}</small></th>"
     html += "</tr></thead><tbody>"
     for p in PITCH_INVENTORY:
         html += f"<tr><td><strong>{p['name']}</strong></td>"
-        for s in range(1, 17): html += f"<td>{grid_data[p['name']].get(s, '-')}</td>"
+        for s in range(1, 16): html += f"<td>{grid_data[p['name']].get(s, '-')}</td>"
         html += "</tr>"
     html += "</tbody></table></body></html>"
     with open(filename, 'w') as f: f.write(html)
@@ -540,6 +557,8 @@ if __name__ == "__main__":
         master = generate_master_schedule(alloc['allocations'], rosters)
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
 
+    print("\nGenerating FINAL RECOMMENDED PROPOSAL...")
+    # Optimal Mix: U6/U7 Boys (6), U7/U8 Girls (6), 6 others with 8 teams each
     final_proposal = [
         {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5},
         {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8},
