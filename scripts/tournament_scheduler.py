@@ -161,16 +161,19 @@ def schedule_10_teams(teams):
 
 def discover_configurations(total_pitches):
     blocks = [
-        {'teams': 6, 'pitches': 1},
-        {'teams': 8, 'pitches': 2},
-        {'teams': 10, 'pitches': 3}
+        {'teams': 6, 'pitches': 1, 'matches': 15},
+        {'teams': 8, 'pitches': 2, 'matches': 28},
+        {'teams': 10, 'pitches': 3, 'matches': 45}
     ]
     valid_configs = []
     
-    for num_age_groups in range(4, 15):
+    for num_age_groups in range(4, 16):
         for combo in itertools.combinations_with_replacement(blocks, num_age_groups):
-            if sum(item['pitches'] for item in combo) == total_pitches:
+            used_pitches = sum(item['pitches'] for item in combo)
+            if used_pitches <= total_pitches:
                 total_teams = sum(item['teams'] for item in combo)
+                total_matches = sum(item['matches'] for item in combo)
+                
                 counts = {6: 0, 8: 0, 10: 0}
                 for item in combo:
                     counts[item['teams']] += 1
@@ -178,13 +181,17 @@ def discover_configurations(total_pitches):
                 config_summary = {
                     'num_age_groups': num_age_groups,
                     'total_teams': total_teams,
+                    'total_matches': total_matches,
+                    'used_pitches': used_pitches,
+                    'spare_pitches': total_pitches - used_pitches,
                     'breakdown': counts
                 }
                 
                 if config_summary not in valid_configs:
                     valid_configs.append(config_summary)
                     
-    valid_configs.sort(key=lambda x: x['num_age_groups'], reverse=True)
+    # Sort by total teams (desc), then total matches (desc)
+    valid_configs.sort(key=lambda x: (x['total_teams'], x['total_matches']), reverse=True)
     return valid_configs
 
 def print_configurations(total_pitches):
@@ -194,10 +201,16 @@ def print_configurations(total_pitches):
     print(f"=======================================================\n")
     
     for i, config in enumerate(configs, 1):
-        print(f"Option {i}: {config['num_age_groups']} Age Groups, {config['total_teams']} Teams")
-        if config['breakdown'][6] > 0: print(f"  - {config['breakdown'][6]} brackets of 6 Teams (1 pitch each)")
-        if config['breakdown'][8] > 0: print(f"  - {config['breakdown'][8]} brackets of 8 Teams (2 pitches each)")
-        if config['breakdown'][10] > 0: print(f"  - {config['breakdown'][10]} brackets of 10 Teams (3 pitches each)")
+        spare_text = f"({config['spare_pitches']} spare)" if config['spare_pitches'] > 0 else "(No spare pitches)"
+        print(f"Option {i}: {config['num_age_groups']} Age Groups")
+        print(f"  TOTAL:")
+        print(f"  - {config['total_teams']} Teams")
+        print(f"  - {config['total_matches']} Matches")
+        print(f"  - {config['used_pitches']} Pitches {spare_text}")
+        print(f"  BREAKDOWN:")
+        if config['breakdown'][6] > 0: print(f"    - {config['breakdown'][6]} brackets of 6 Teams (1 pitch each)")
+        if config['breakdown'][8] > 0: print(f"    - {config['breakdown'][8]} brackets of 8 Teams (2 pitches each)")
+        if config['breakdown'][10] > 0: print(f"    - {config['breakdown'][10]} brackets of 10 Teams (3 pitches each)")
         print("-" * 40)
     print("\n")
 
@@ -314,11 +327,18 @@ def export_to_csv(master_schedule, filename="master_schedule.csv"):
         writer.writeheader()
         writer.writerows(sorted_schedule)
 
-def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html"):
+def generate_summary_dashboard(allocations, master_schedule, title, filename="summary_dashboard.html", config_info=None):
     """Generates the high-level dashboard with Zone Map, Breakdown, and Abstract Schedule Grid."""
     print(f"Exporting Summary Dashboard: {filename}...")
     
-    # 1. Prepare Zone Map Data
+    # 1. Prepare Totals Summary
+    total_teams = sum(a['teams'] for a in allocations)
+    total_matches = len(master_schedule)
+    used_pitches = sum(a['pitches_req'] for a in allocations)
+    spare_pitches = config_info['spare_pitches'] if config_info else 0
+    spare_text = f"({spare_pitches} spare)" if spare_pitches > 0 else "(No spare pitches)"
+
+    # 2. Prepare Zone Map Data
     zones = {}
     for alloc in allocations:
         for pitch in alloc['assigned_pitches']:
@@ -326,7 +346,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
             if z not in zones: zones[z] = []
             zones[z].append({'name': pitch['name'], 'age': alloc['age_group']})
             
-    # 2. Prepare Active Slots Map
+    # 3. Prepare Active Slots Map
     pitch_schedule = {}
     for match in master_schedule:
         p_id = match['pitch_id']
@@ -334,11 +354,15 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
             pitch_schedule[p_id] = {}
         pitch_schedule[p_id][match['slot']] = match['age_group']
 
-    # 3. Build HTML Structure
+    # 4. Build HTML Structure
     css = """
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         h1, h2 { text-align: center; color: #2c3e50; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .summary-bar { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
+        .summary-item { text-align: center; }
+        .summary-item .val { display: block; font-size: 1.5em; font-weight: bold; }
+        .summary-item .lbl { font-size: 0.8em; text-transform: uppercase; opacity: 0.8; }
         .zone-wrapper { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 40px; flex-wrap: wrap; }
         .zone { flex: 1; min-width: 200px; padding: 15px; border-radius: 8px; text-align: center; color: white; }
         .zone h3 { margin-top: 0; font-size: 1.1em; border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 10px; }
@@ -351,15 +375,23 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
         .time-header { font-size: 0.8em; background-color: #bdc3c7; }
-        .cell-u6, .cell-u7, .cell-u8, .cell-u9 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
-        .cell-u10, .cell-u11 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
-        .cell-u12 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
-        .cell-u13, .cell-u14 { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-u6, .cell-u7, .cell-u8, .cell-u9, .cell-u10, .cell-u11, .cell-u12, .cell-u13, .cell-u14, .cell-u15, .cell-u16, .cell-u17, .cell-u18, .cell-u19 { font-weight: bold; }
+        .cell-u6, .cell-u7, .cell-u8, .cell-u9 { background-color: #d5f5e3; color: #1e8449; }
+        .cell-u10, .cell-u11 { background-color: #d6eaf8; color: #21618c; }
+        .cell-u12, .cell-u13 { background-color: #fdebd0; color: #b9770e; }
+        .cell-u14, .cell-u15, .cell-u16, .cell-u17, .cell-u18, .cell-u19 { background-color: #fadbd8; color: #943126; }
         .cell-break { background-color: #f2f3f4; color: #a6acaf; font-style: italic;}
     """
     
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{title}</title><style>{css}</style></head>
-    <body><div class="container"><h1>Tournament Configuration: {title}</h1><hr><h2>1. Pitch Map & Zone Assignment</h2><div class="zone-wrapper">"""
+    <body><div class="container"><h1>Tournament Configuration: {title}</h1>
+    <div class="summary-bar">
+        <div class="summary-item"><span class="val">{len(allocations)}</span><span class="lbl">Age Groups</span></div>
+        <div class="summary-item"><span class="val">{total_teams}</span><span class="lbl">Total Teams</span></div>
+        <div class="summary-item"><span class="val">{total_matches}</span><span class="lbl">Total Matches</span></div>
+        <div class="summary-item"><span class="val">{used_pitches}</span><span class="lbl">Pitches {spare_text}</span></div>
+    </div>
+    <hr><h2>1. Pitch Map & Zone Assignment</h2><div class="zone-wrapper">"""
     
     # Generate Zone Map
     for z in sorted(zones.keys()):
@@ -500,7 +532,8 @@ if __name__ == "__main__":
             allocation_data['allocations'], 
             master_schedule, 
             allocation_data['title'], 
-            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html")
+            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html"),
+            config_info=selected_config
         )
         generate_detailed_html_grid(
             master_schedule, 
@@ -512,7 +545,13 @@ if __name__ == "__main__":
         # or just keep the primary ones as Option 1
         if i == 1:
             export_to_csv(master_schedule, "master_schedule.csv")
-            generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html")
+            generate_summary_dashboard(
+                allocation_data['allocations'], 
+                master_schedule, 
+                allocation_data['title'], 
+                "summary_dashboard.html",
+                config_info=selected_config
+            )
             generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
     
     print(f"\n--- Process Complete! All {len(configs)} options generated in '{output_dir}/'. ---")
