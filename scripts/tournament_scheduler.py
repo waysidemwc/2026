@@ -461,38 +461,58 @@ if __name__ == "__main__":
     configs = discover_configurations(total_pitches=PITCH_COUNT)
     print_configurations(total_pitches=PITCH_COUNT)
     
-    # 1. Select the first discovered configuration (Option 1)
     if not configs:
         print("No valid configurations discovered.")
         exit(1)
+
+    # Create an output directory for options if it doesn't exist
+    output_dir = "options_output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
         
-    selected_idx = 0
-    selected_config = configs[selected_idx]
-    option_label = f"Option {selected_idx + 1}"
+    print(f"Generating files for {len(configs)} options in '{output_dir}/'...")
     
-    print(f"Using {option_label} for file generation...")
+    for i, selected_config in enumerate(configs, 1):
+        option_label = f"Option {i}"
+        file_suffix = f"option_{i}"
+        
+        # 1. Map to Age Groups
+        age_groups_config = map_config_to_ages(selected_config)
+        
+        # 2. Master Team List Mapper
+        MASTER_TEAM_LIST = [
+            'IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 
+            'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE'
+        ]
+        
+        # Dynamically build rosters
+        TEAM_ROSTERS = {}
+        for group in age_groups_config:
+            TEAM_ROSTERS[group['age']] = MASTER_TEAM_LIST[:group['teams']]
+        
+        # 3. Run the engines
+        allocation_data = allocate_tournament(option_label, age_groups_config)
+        master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
+        
+        # 4. Export all files with unique names
+        export_to_csv(master_schedule, os.path.join(output_dir, f"master_schedule_{file_suffix}.csv"))
+        generate_summary_dashboard(
+            allocation_data['allocations'], 
+            master_schedule, 
+            allocation_data['title'], 
+            os.path.join(output_dir, f"summary_dashboard_{file_suffix}.html")
+        )
+        generate_detailed_html_grid(
+            master_schedule, 
+            allocation_data['allocations'], 
+            os.path.join(output_dir, f"master_schedule_grid_{file_suffix}.html")
+        )
+        
+        # Also maintain "latest" symlink or copy for convenience if needed, 
+        # or just keep the primary ones as Option 1
+        if i == 1:
+            export_to_csv(master_schedule, "master_schedule.csv")
+            generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html")
+            generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
     
-    # 2. Map to Age Groups
-    age_groups_config = map_config_to_ages(selected_config)
-    
-    # 3. Master Team List Mapper
-    MASTER_TEAM_LIST = [
-        'IRELAND', 'GERMANY', 'SPAIN', 'HOLLAND', 'BRAZIL', 
-        'ARGENTINA', 'PORTUGAL', 'ENGLAND', 'ITALY', 'FRANCE'
-    ]
-    
-    # Dynamically build rosters
-    TEAM_ROSTERS = {}
-    for group in age_groups_config:
-        TEAM_ROSTERS[group['age']] = MASTER_TEAM_LIST[:group['teams']]
-    
-    # 4. Run the engines
-    allocation_data = allocate_tournament(option_label, age_groups_config)
-    master_schedule = generate_master_schedule(allocation_data['allocations'], TEAM_ROSTERS)
-    
-    # 5. Export all files
-    export_to_csv(master_schedule, "master_schedule.csv")
-    generate_summary_dashboard(allocation_data['allocations'], master_schedule, allocation_data['title'], "summary_dashboard.html")
-    generate_detailed_html_grid(master_schedule, allocation_data['allocations'], "master_schedule_grid.html")
-    
-    print("\n--- Process Complete! Output files generated. ---")
+    print(f"\n--- Process Complete! All {len(configs)} options generated in '{output_dir}/'. ---")
