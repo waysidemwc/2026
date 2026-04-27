@@ -244,16 +244,23 @@ def allocate_tournament(option_name, age_groups):
         'JP3': [p for p in PITCH_INVENTORY if p['zone'] == 'JP3'],
         'JP4': [p for p in PITCH_INVENTORY if p['zone'] == 'JP4'],
     }
-    sorted_groups = sorted(age_groups, key=lambda x: get_requirements(x['teams'])[1], reverse=True)
+    
+    # Sort groups: those with explicit zones first, then by size
+    sorted_groups = sorted(age_groups, key=lambda x: (x.get('preferred_zone') is None, -get_requirements(x['teams'])[1]))
+    
     allocations_map = {}
     for group in sorted_groups:
         age = group['age']
         teams = group['teams']
         players_per = group.get('players_per_team', 0)
         matches, pitches_needed = get_requirements(teams)
+        preferred_zone = group.get('preferred_zone')
+        
         placed = False
-        for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
-            if len(zone_inventory[z_name]) >= pitches_needed:
+        zones_to_try = [preferred_zone] if preferred_zone else ['JP1', 'JP2', 'JP3', 'JP4']
+        
+        for z_name in zones_to_try:
+            if z_name in zone_inventory and len(zone_inventory[z_name]) >= pitches_needed:
                 assigned = [zone_inventory[z_name].pop(0) for _ in range(pitches_needed)]
                 allocations_map[age] = {
                     'age_group': age, 'teams': teams, 'players_per_team': players_per,
@@ -262,7 +269,9 @@ def allocate_tournament(option_name, age_groups):
                 }
                 placed = True
                 break
+        
         if not placed:
+            # Fallback: grab whatever is left across all zones
             assigned = []
             for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
                 while zone_inventory[z_name] and len(assigned) < pitches_needed:
@@ -272,6 +281,7 @@ def allocate_tournament(option_name, age_groups):
                 'total_players': teams * players_per, 'matches': matches,
                 'pitches_req': pitches_needed, 'assigned_pitches': assigned
             }
+            
     final_allocations = []
     for g in age_groups: final_allocations.append(allocations_map[g['age']])
     return {'title': option_name, 'allocations': final_allocations}
@@ -385,10 +395,10 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.9em; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
-        .cell-u6, .cell-u7, .cell-u8, .cell-u9 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
-        .cell-u10, .cell-u11 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
-        .cell-u12, .cell-u13 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
-        .cell-u14 { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
+        .cell-jp2 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
+        .cell-jp3 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
+        .cell-jp4 { background-color: #fadbd8; color: #943126; font-weight: bold;}
         .status-pass { color: #27ae60; font-weight: bold; }
         .status-warn { color: #e67e22; font-weight: bold; }
         .discovery-table { font-size: 0.85em; }
@@ -429,7 +439,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         html += f"<tr><td><strong>{p['name']}</strong></td>"
         for s in range(1, 16):
             age = pitch_schedule[p['id']].get(s)
-            cls = f"cell-{age.split(' ')[0].lower()}" if age else ""
+            cls = f"cell-{p['zone'].lower()}" if age else ""
             html += f'<td class="{cls}">{age if age else "-"}</td>'
         html += "</tr>"
     
@@ -560,14 +570,14 @@ if __name__ == "__main__":
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
 
     final_proposal = [
-        {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5},
-        {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U9 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U10 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U11 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U12 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 8},
-        {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5},
+        {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5, 'preferred_zone': 'JP3'},
+        {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP3'},
+        {'age': 'U9 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP4'},
+        {'age': 'U10 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP1'},
+        {'age': 'U11 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP1'},
+        {'age': 'U12 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP2'},
+        {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP2'},
+        {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5, 'preferred_zone': 'JP4'},
     ]
     final_info = {'num_age_groups': len(final_proposal), 'total_teams': sum(g['teams'] for g in final_proposal), 'total_players': sum(g['teams']*g['players_per_team'] for g in final_proposal), 'used_pitches': 14, 'spare_pitches': 0}
     rosters_final = {g['age']: [f"T{j}" for j in range(1, g['teams']+1)] for g in final_proposal}
