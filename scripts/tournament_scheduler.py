@@ -40,10 +40,13 @@ def schedule_6_teams(teams):
         (1,5), (0,4), (2,5), (1,3), (0,5), (3,4), (1,2)
     ]
     
+    # Available slots: 1-7 and 9-16 (skipping 8)
+    available_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15,16]
+    
     matches = []
     for i, (idx1, idx2) in enumerate(optimal_sequence):
         matches.append({
-            'slot': i + 1, 
+            'slot': available_slots[i], 
             'pitch_idx': 0, 
             't1': teams[idx1], 
             't2': teams[idx2]
@@ -160,15 +163,16 @@ def schedule_8_teams(teams):
     """8 Teams, 2 Pitches, 28 Matches. Optimized for rest."""
     rounds = generate_round_robin(teams)
     all_matches = [m for r in rounds for m in r]
-    # Use slots 1-14 only (7 per night) so 8-team groups finish at 8:30 PM latest
-    physical_slots = list(range(1, 15))
+    # Use 7 slots Tue (1-7) and 7 slots Thu (9-15)
+    physical_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15]
     return optimize_spacing(teams, all_matches, num_pitches=2, physical_slots=physical_slots)
 
 def schedule_10_teams(teams):
      """10 Teams, 3 Pitches, 45 Matches. Optimized for rest."""
      rounds = generate_round_robin(teams)
      all_matches = [m for r in rounds for m in r]
-     physical_slots = list(range(1, 16))
+     # Use 7 slots Tue (1-7) and 8 slots Thu (9-16)
+     physical_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15,16]
      return optimize_spacing(teams, all_matches, num_pitches=3, physical_slots=physical_slots)
 
 # ==========================================
@@ -241,9 +245,9 @@ PITCH_INVENTORY = [
 
 TIME_MAP = {
     1: "Tue 6:30-6:45", 2: "Tue 6:45-7:00", 3: "Tue 7:00-7:15", 4: "Tue 7:15-7:30",
-    5: "Tue 7:30-7:45", 6: "Tue 7:45-8:00", 7: "Tue 8:00-8:15",
-    8: "Thu 6:30-6:45", 9: "Thu 6:45-7:00", 10: "Thu 7:00-7:15", 11: "Thu 7:15-7:30",
-    12: "Thu 7:30-7:45", 13: "Thu 7:45-8:00", 14: "Thu 8:00-8:15", 15: "Thu 8:15-8:30"
+    5: "Tue 7:30-7:45", 6: "Tue 7:45-8:00", 7: "Tue 8:00-8:15", 8: "Tue 8:15-8:30 (Free)",
+    9: "Thu 6:30-6:45", 10: "Thu 6:45-7:00", 11: "Thu 7:00-7:15", 12: "Thu 7:15-7:30",
+    13: "Thu 7:30-7:45", 14: "Thu 7:45-8:00", 15: "Thu 8:00-8:15", 16: "Thu 8:15-8:30"
 }
 
 def get_requirements(team_count):
@@ -396,15 +400,22 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     for a in allocations:
         for p in a['assigned_pitches']: zones[p['zone']].append({'name': p['name'], 'age': a['age_group']})
             
+    # Pitch to Age mapping for the Age column
+    pitch_to_age = {}
+    for a in allocations:
+        for p_assigned in a['assigned_pitches']:
+            pitch_to_age[p_assigned['id']] = a['age_group']
+
     pitch_schedule = defaultdict(dict)
-    for m in master_schedule: pitch_schedule[m['pitch_id']][m['slot']] = m['age_group']
+    for m in master_schedule: 
+        pitch_schedule[m['pitch_id']][m['slot']] = f"{m['team1']}<br>vs<br>{m['team2']}"
 
     nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; Back to Recommended Proposal Index</a></div>' if index_link else ""
     
     css = """
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
         h1, h2 { text-align: center; color: #2c3e50; }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .container { max-width: 1300px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .summary-bar { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
         .summary-item { text-align: center; }
         .summary-item .val { display: block; font-size: 1.5em; font-weight: bold; }
@@ -417,7 +428,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .jp1 { background-color: #27ae60; } .jp2 { background-color: #2980b9; } .jp3 { background-color: #e67e22; } .jp4 { background-color: #c0392b; }
         .table-container { overflow-x: auto; margin-bottom: 40px; }
         table { width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.9em; }
+        th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.8em; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
         .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
@@ -455,17 +466,18 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         play_time_pct = (matches_per_team / 15) * 100
         html += f"<tr><td><strong>{a['age_group']}</strong></td><td>{a['teams']} Teams</td><td>{a.get('players_per_team', 'N/A')}</td><td>{a.get('total_players', 'N/A')}</td><td>{matches_per_team}</td><td>{play_time_pct:.1f}%</td><td>{a['matches']}</td><td>{a['pitches_req']}</td><td><span class='{z.lower()}'>{z}</span></td></tr>"
     
-    html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule</h2><div class="table-container"><table><thead><tr><th>Pitch</th>'
-    for i in range(1, 16): 
+    html += '</tbody></table></div><hr><h2>3. Master Tournament Schedule</h2><div class="table-container"><table><thead><tr><th>Pitch</th><th>Age</th>'
+    for i in range(1, 17): 
         label = TIME_MAP[i].replace(' ', '<br>')
         html += f"<th>S{i}<br><small>{label}</small></th>"
     html += '</tr></thead><tbody>'
     for p in PITCH_INVENTORY:
-        html += f"<tr><td><strong>{p['name']}</strong></td>"
-        for s in range(1, 16):
-            age = pitch_schedule[p['id']].get(s)
-            cls = f"cell-{p['zone'].lower()}" if age else ""
-            html += f'<td class="{cls}">{age if age else "-"}</td>'
+        age_group_name = pitch_to_age.get(p['id'], "-")
+        html += f"<tr><td><strong>{p['name']}</strong></td><td><small>{age_group_name}</small></td>"
+        for s in range(1, 17):
+            fixture = pitch_schedule[p['id']].get(s)
+            cls = f"cell-{p['zone'].lower()}" if fixture else ""
+            html += f'<td class="{cls}">{fixture if fixture else "-"}</td>'
         html += "</tr>"
     
     # 4. Validation Report with Age Breakdown
@@ -554,13 +566,13 @@ def generate_detailed_html_grid(master_schedule, allocations, filename="master_s
     grid_data = defaultdict(dict)
     for m in master_schedule: grid_data[m['pitch_name']][m['slot']] = f"{m['team1']}<br>vs<br>{m['team2']}"
     html = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Matchup Grid</title><style>body{font-family:Arial;margin:20px;}table{width:100%;border-collapse:collapse;text-align:center;}th,td{border:1px solid #ddd;padding:5px;font-size:0.8em;}</style></head><body><h1>Detailed Matchup Grid</h1><table><thead><tr><th>Pitch</th>"""
-    for i in range(1, 16):
+    for i in range(1, 17):
         label = TIME_MAP[i].replace(' ', '<br>')
         html += f"<th>S{i}<br><small>{label}</small></th>"
     html += "</tr></thead><tbody>"
     for p in PITCH_INVENTORY:
         html += f"<tr><td><strong>{p['name']}</strong></td>"
-        for s in range(1, 16): html += f"<td>{grid_data[p['name']].get(s, '-')}</td>"
+        for s in range(1, 17): html += f"<td>{grid_data[p['name']].get(s, '-')}</td>"
         html += "</tr>"
     html += "</tbody></table></body></html>"
     with open(filename, 'w') as f: f.write(html)
