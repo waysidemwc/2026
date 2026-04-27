@@ -49,9 +49,10 @@ def schedule_6_teams(teams, use_cache=True):
         return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in cached]
 
     # Hardcoded optimal stagger for perfectly even rest
+    # Flipped some pairs to ensure Home/Away balance for every team (0-5)
     optimal_sequence = [
-        (0,1), (2,3), (4,5), (0,2), (3,5), (1,4), (0,3), (2,4),
-        (1,5), (0,4), (2,5), (1,3), (0,5), (3,4), (1,2)
+        (0,1), (3,2), (4,5), (2,0), (5,3), (1,4), (0,3), (4,2),
+        (5,1), (3,4), (2,5), (1,0), (5,0), (4,3), (1,2)
     ]
     
     # Available slots: 1-7 and 9-16 (skipping 8)
@@ -157,10 +158,24 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None,
                 scheduled.append({'slot': slot, 'pitch_idx': i, 't1_idx': t1, 't2_idx': t2})
                 
         if not remaining:
-            eval_score = (max_consecutive_for_any_team * -100000) + (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
-            if eval_score > best_overall_score:
-                best_overall_score = eval_score
-                best_schedule = scheduled
+            # Listing Fairness Penalty
+            home_away_counts = defaultdict(lambda: {'h':0, 'a':0})
+            for m_final in scheduled:
+                home_away_counts[m_final['t1_idx']]['h'] += 1
+                home_away_counts[m_final['t2_idx']]['a'] += 1
+            
+            listing_penalty = 0
+            for i_idx in range(len(teams)):
+                if home_away_counts[i_idx]['h'] == 0 or home_away_counts[i_idx]['a'] == 0:
+                    listing_penalty += 1
+
+            # SCORING ENGINE:
+            # 1. Listing Fairness (must have at least one of each)
+            # 2. Triple back-to-back penalty
+            # 3. Back-to-back penalty
+            # 4. Maximize min rest
+            # 5. Total rest
+            eval_score = (listing_penalty * -500000) + (max_consecutive_for_any_team * -100000) + (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
                 
     if best_schedule:
         if use_cache and size_key: SCHEDULE_CACHE[size_key] = best_schedule
