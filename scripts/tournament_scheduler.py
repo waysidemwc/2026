@@ -667,12 +667,10 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir): os.makedirs(output_dir)
     
     for i, c in enumerate(configs, 1):
-        # We don't cache discovery options to keep them varied, or we could if requested.
-        # For now, let's keep them varied but use the seed for stability.
         age_groups = map_config_to_ages(c)
         rosters = {g['age']: [f"T{j}" for j in range(1, g['teams']+1)] for g in age_groups}
-        alloc = allocate_tournament(f"Option {i}", age_groups, use_cache=False)
-        master = generate_master_schedule(alloc['allocations'], rosters, use_cache=False)
+        alloc = allocate_tournament(f"Option {i}", age_groups, use_cache=use_cache)
+        master = generate_master_schedule(alloc['allocations'], rosters, use_cache=use_cache)
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
 
     # Final Recommended Proposal - RE-ENABLE CACHE HERE
