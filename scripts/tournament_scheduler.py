@@ -437,6 +437,14 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     for a in allocations:
         for p in a['assigned_pitches']: zones[p['zone']].append({'name': p['name'], 'age': a['age_group']})
             
+    # Map age groups to specific color classes
+    age_color_map = {
+        'U10 Mixed': 'cell-u10', 'U11 Mixed': 'cell-u11',
+        'U12 Mixed': 'cell-u12', 'U13 Mixed': 'cell-u13',
+        'U8 Boys': 'cell-u8', 'U6/U7 Boys': 'cell-u6u7',
+        'U9 Mixed': 'cell-u9', 'U7/U8 Girls': 'cell-u7u8'
+    }
+
     # Pitch to Age mapping for the Age column
     pitch_to_age = {}
     for a in allocations:
@@ -469,6 +477,16 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .fixture { font-size: 0.8em; line-height: 1.1; font-weight: bold; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
+        .cell-u10 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
+        .cell-u11 { background-color: #abebc6; color: #1e8449; font-weight: bold;}
+        .cell-u12 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
+        .cell-u13 { background-color: #aed6f1; color: #21618c; font-weight: bold;}
+        .cell-u8 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
+        .cell-u6u7 { background-color: #fad7a0; color: #b9770e; font-weight: bold;}
+        .cell-u9 { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-u7u8 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
+        
+        /* Fallbacks */
         .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
         .cell-jp2 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
         .cell-jp3 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
@@ -511,11 +529,11 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     html += '</tr></thead><tbody>'
     for p in PITCH_INVENTORY:
         age_group_name = pitch_to_age.get(p['id'], "-")
-        zone_cls = f"cell-{p['zone'].lower()}"
-        html += f"<tr><td class='{zone_cls}'><strong>{p['name']}</strong></td><td class='{zone_cls}'><small>{age_group_name}</small></td>"
+        age_cls = age_color_map.get(age_group_name, f"cell-{p['zone'].lower()}")
+        html += f"<tr><td class='{age_cls}'><strong>{p['name']}</strong></td><td class='{age_cls}'><small>{age_group_name}</small></td>"
         for s in range(1, 17):
             fixture = pitch_schedule[p['id']].get(s)
-            html += f'<td class="{zone_cls}">{fixture if fixture else "-"}</td>'
+            html += f'<td class="{age_cls}">{fixture if fixture else "-"}</td>'
         html += "</tr>"
     
     # 4. Validation Report with Age Breakdown
