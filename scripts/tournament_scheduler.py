@@ -473,11 +473,11 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     html += '</tr></thead><tbody>'
     for p in PITCH_INVENTORY:
         age_group_name = pitch_to_age.get(p['id'], "-")
-        html += f"<tr><td><strong>{p['name']}</strong></td><td><small>{age_group_name}</small></td>"
+        zone_cls = f"cell-{p['zone'].lower()}"
+        html += f"<tr><td><strong>{p['name']}</strong></td><td class='{zone_cls}'><small>{age_group_name}</small></td>"
         for s in range(1, 17):
             fixture = pitch_schedule[p['id']].get(s)
-            cls = f"cell-{p['zone'].lower()}" if fixture else ""
-            html += f'<td class="{cls}">{fixture if fixture else "-"}</td>'
+            html += f'<td class="{zone_cls}">{fixture if fixture else "-"}</td>'
         html += "</tr>"
     
     # 4. Validation Report with Age Breakdown
