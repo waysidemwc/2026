@@ -99,7 +99,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None,
                 fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1': matches[m_idx][0], 't2': matches[m_idx][1]})
                 m_idx += 1
                 
-    for _ in range(1000):
+    for _ in range(5000): # Run 5000 variations
         shuffled_indices = idx_matches[:]
         random.shuffle(shuffled_indices)
         remaining = shuffled_indices[:]
