@@ -503,9 +503,9 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                     <div style="flex: 1; min-width: 300px;">
                         <h4 style="margin-top:0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Capacity Math</h4>
                         <ul style="padding-left: 20px;">
-                            <li><strong>Total Time:</strong> 1 hour 45 mins per night (7 core slots per night)</li>
-                            <li><strong>Pitch Capacity:</strong> 14 core matches (plus S15 overrun if needed)</li>
-                            <li><strong>Tournament Cap (14 Pitches):</strong> 196 core match slots</li>
+                            <li><strong>Total Time:</strong> 2 hours per night (8 core slots per night)</li>
+                            <li><strong>Pitch Capacity:</strong> 16 core matches</li>
+                            <li><strong>Tournament Cap (14 Pitches):</strong> 224 core match slots</li>
                         </ul>
                     </div>
                 </div>
