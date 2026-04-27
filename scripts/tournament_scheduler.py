@@ -2,7 +2,13 @@ import itertools
 import os
 import csv
 import random
+import argparse
 from collections import defaultdict
+
+# ==========================================
+# GLOBAL CACHE
+# ==========================================
+SCHEDULE_CACHE = {}
 
 # ==========================================
 # 1. ROUND-ROBIN SCHEDULING LOGIC
@@ -29,11 +35,16 @@ def generate_round_robin(teams):
         
     return matches
 
-def schedule_6_teams(teams):
+def schedule_6_teams(teams, use_cache=True):
     """
     6 Teams, 1 Pitch, 15 Matches.
     Uses an explicitly optimized pattern to guarantee perfectly spaced rests.
     """
+    if use_cache and "6_teams" in SCHEDULE_CACHE:
+        # Map cached abstract indices to these specific team names
+        cached = SCHEDULE_CACHE["6_teams"]
+        return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in cached]
+
     # Hardcoded optimal stagger for perfectly even rest
     optimal_sequence = [
         (0,1), (2,3), (4,5), (0,2), (3,5), (1,4), (0,3), (2,4),
@@ -44,6 +55,7 @@ def schedule_6_teams(teams):
     available_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15,16]
     
     matches = []
+    abstract_matches = []
     for i, (idx1, idx2) in enumerate(optimal_sequence):
         matches.append({
             'slot': available_slots[i], 
@@ -51,14 +63,30 @@ def schedule_6_teams(teams):
             't1': teams[idx1], 
             't2': teams[idx2]
         })
+        abstract_matches.append({
+            'slot': available_slots[i], 
+            'pitch_idx': 0, 
+            't1_idx': idx1, 
+            't2_idx': idx2
+        })
+    
+    if use_cache: SCHEDULE_CACHE["6_teams"] = abstract_matches
     return matches
 
-def optimize_spacing(teams, matches, num_pitches, physical_slots):
+def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None, use_cache=True):
     """Uses a Monte-Carlo Greedy approach to find the schedule with the best possible rest spacing."""
+    if use_cache and size_key and size_key in SCHEDULE_CACHE:
+        cached = SCHEDULE_CACHE[size_key]
+        return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in cached]
+
     best_schedule = []
     best_overall_score = -9999999
     
-    # Fallback schedule (sequential) in case the optimizer hits a dead end
+    # Map teams to indices for caching
+    team_to_idx = {t: i for i, t in enumerate(teams)}
+    idx_matches = [(team_to_idx[m[0]], team_to_idx[m[1]]) for m in matches]
+    
+    # Fallback
     fallback_schedule = []
     m_idx = 0
     for slot in physical_slots:
@@ -67,26 +95,23 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1': matches[m_idx][0], 't2': matches[m_idx][1]})
                 m_idx += 1
                 
-    for _ in range(1000): # Run 1000 variations
-        shuffled_matches = matches[:]
-        random.shuffle(shuffled_matches)
-        remaining = shuffled_matches[:]
+    for _ in range(1000):
+        shuffled_indices = idx_matches[:]
+        random.shuffle(shuffled_indices)
+        remaining = shuffled_indices[:]
         scheduled = []
-        team_last_played = {t: -99 for t in teams}
+        team_last_played = {i: -99 for i in range(len(teams))}
         
         min_rest_in_schedule = 999
         total_rest_score = 0
         back_to_back_count = 0
         
-        team_consecutive_tracker = {t: 0 for t in teams}
+        team_consecutive_tracker = {i: 0 for i in range(len(teams))}
         max_consecutive_for_any_team = 0
         
         for slot in physical_slots:
             slot_matches = []
             teams_in_slot = set()
-            
-            # Reset tracker for teams NOT playing in this slot
-            # (We will update teams WHO ARE playing inside the match loop)
             
             while len(slot_matches) < num_pitches and remaining:
                 best_match = None
@@ -94,14 +119,10 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 
                 for m in remaining:
                     t1, t2 = m
-                    if t1 in teams_in_slot or t2 in teams_in_slot:
-                        continue 
-                        
+                    if t1 in teams_in_slot or t2 in teams_in_slot: continue 
                     dist1 = slot - team_last_played[t1]
                     dist2 = slot - team_last_played[t2]
-                    
                     score = min(dist1, dist2)
-                    
                     if score > best_match_score:
                         best_match_score = score
                         best_match = m
@@ -109,7 +130,6 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 if best_match:
                     d1 = slot - team_last_played[best_match[0]]
                     d2 = slot - team_last_played[best_match[1]]
-                    
                     if 0 < d1 < 50: 
                         min_rest_in_schedule = min(min_rest_in_schedule, d1)
                         total_rest_score += d1
@@ -118,62 +138,47 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                         min_rest_in_schedule = min(min_rest_in_schedule, d2)
                         total_rest_score += d2
                         if d2 == 1: back_to_back_count += 1
-                        
                     slot_matches.append(best_match)
                     teams_in_slot.update(best_match)
                     remaining.remove(best_match)
-                else:
-                    break 
+                else: break 
             
             for i, m in enumerate(slot_matches):
                 t1, t2 = m[0], m[1]
-                
-                # Update consecutive tracking
                 for t in [t1, t2]:
-                    if slot == team_last_played[t] + 1:
-                        team_consecutive_tracker[t] += 1
-                    else:
-                        team_consecutive_tracker[t] = 0
+                    if slot == team_last_played[t] + 1: team_consecutive_tracker[t] += 1
+                    else: team_consecutive_tracker[t] = 0
                     max_consecutive_for_any_team = max(max_consecutive_for_any_team, team_consecutive_tracker[t])
-
                 team_last_played[t1] = slot
                 team_last_played[t2] = slot
-                scheduled.append({
-                    'slot': slot,
-                    'pitch_idx': i,
-                    't1': t1,
-                    't2': t2
-                })
+                scheduled.append({'slot': slot, 'pitch_idx': i, 't1_idx': t1, 't2_idx': t2})
                 
         if not remaining:
-            # SCORING ENGINE:
-            # 1. Heavily penalize 3+ games in a row (triple back-to-back)
-            # 2. Penalize back-to-back games (interval=1)
-            # 3. Maximize the minimum rest any team gets. 
-            # 4. Tiebreaker: total aggregate rest.
             eval_score = (max_consecutive_for_any_team * -100000) + (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
-            
             if eval_score > best_overall_score:
                 best_overall_score = eval_score
                 best_schedule = scheduled
                 
-    return best_schedule if best_schedule else fallback_schedule
+    if best_schedule:
+        if use_cache and size_key: SCHEDULE_CACHE[size_key] = best_schedule
+        return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in best_schedule]
+    return fallback_schedule
 
-def schedule_8_teams(teams):
+def schedule_8_teams(teams, use_cache=True):
     """8 Teams, 2 Pitches, 28 Matches. Optimized for rest."""
     rounds = generate_round_robin(teams)
     all_matches = [m for r in rounds for m in r]
     # Use 7 slots Tue (1-7) and 7 slots Thu (9-15)
     physical_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15]
-    return optimize_spacing(teams, all_matches, num_pitches=2, physical_slots=physical_slots)
+    return optimize_spacing(teams, all_matches, num_pitches=2, physical_slots=physical_slots, size_key="8_teams", use_cache=use_cache)
 
-def schedule_10_teams(teams):
+def schedule_10_teams(teams, use_cache=True):
      """10 Teams, 3 Pitches, 45 Matches. Optimized for rest."""
      rounds = generate_round_robin(teams)
      all_matches = [m for r in rounds for m in r]
      # Use 7 slots Tue (1-7) and 8 slots Thu (9-16)
      physical_slots = [1,2,3,4,5,6,7, 9,10,11,12,13,14,15,16]
-     return optimize_spacing(teams, all_matches, num_pitches=3, physical_slots=physical_slots)
+     return optimize_spacing(teams, all_matches, num_pitches=3, physical_slots=physical_slots, size_key="10_teams", use_cache=use_cache)
 
 # ==========================================
 # 2. CONFIGURATION DISCOVERY ENGINE
@@ -256,7 +261,7 @@ def get_requirements(team_count):
     elif team_count <= 10: return 45, 3
     else: raise ValueError("Team count must be 6, 8, or 10.")
 
-def allocate_tournament(option_name, age_groups):
+def allocate_tournament(option_name, age_groups, use_cache=True):
     zone_inventory = {
         'JP1': [p for p in PITCH_INVENTORY if p['zone'] == 'JP1'],
         'JP2': [p for p in PITCH_INVENTORY if p['zone'] == 'JP2'],
@@ -358,15 +363,15 @@ def perform_validation(master_schedule):
         'min_rest': min_rest if min_rest < 99 else 0
     }
 
-def generate_master_schedule(allocations, team_rosters):
+def generate_master_schedule(allocations, team_rosters, use_cache=True):
     master_schedule = []
     for alloc in allocations:
         age = alloc['age_group']
         teams = team_rosters.get(age, [f"{age}-T{i}" for i in range(1, alloc['teams'] + 1)])
         group_matches = []
-        if len(teams) == 6: group_matches = schedule_6_teams(teams)
-        elif len(teams) == 8: group_matches = schedule_8_teams(teams)
-        elif len(teams) == 10: group_matches = schedule_10_teams(teams)
+        if len(teams) == 6: group_matches = schedule_6_teams(teams, use_cache=use_cache)
+        elif len(teams) == 8: group_matches = schedule_8_teams(teams, use_cache=use_cache)
+        elif len(teams) == 10: group_matches = schedule_10_teams(teams, use_cache=use_cache)
         for m in group_matches:
             pitch_obj = alloc['assigned_pitches'][m['pitch_idx']]
             master_schedule.append({
@@ -595,18 +600,31 @@ def generate_readme_index(configs, output_dir, filename="README.md", final_info=
     with open(filename, 'w') as f: f.write(content)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Tournament Scheduler")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--no-cache", action="store_true", help="Disable schedule caching by bracket size")
+    args = parser.parse_args()
+
+    random.seed(args.seed)
+    use_cache = not args.no_cache
+    
     PITCH_COUNT = 14
     configs = discover_configurations(total_pitches=PITCH_COUNT)
     output_dir = "options_output"
     if not os.path.exists(output_dir): os.makedirs(output_dir)
     
     for i, c in enumerate(configs, 1):
+        # We don't cache discovery options to keep them varied, or we could if requested.
+        # For now, let's keep them varied but use the seed for stability.
         age_groups = map_config_to_ages(c)
         rosters = {g['age']: [f"T{j}" for j in range(1, g['teams']+1)] for g in age_groups}
-        alloc = allocate_tournament(f"Option {i}", age_groups)
-        master = generate_master_schedule(alloc['allocations'], rosters)
+        alloc = allocate_tournament(f"Option {i}", age_groups, use_cache=False)
+        master = generate_master_schedule(alloc['allocations'], rosters, use_cache=False)
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
 
+    # Final Recommended Proposal - RE-ENABLE CACHE HERE
+    SCHEDULE_CACHE.clear() # clear from discovery runs
+    
     final_proposal = [
         {'age': 'U6/U7 Boys', 'teams': 6, 'players_per_team': 5, 'preferred_zone': 'JP3'},
         {'age': 'U8 Boys', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP3'},
@@ -619,13 +637,12 @@ if __name__ == "__main__":
     ]
     
     COUNTRIES = ["IRELAND", "GERMANY", "SPAIN", "ARGENTINA", "HOLLAND", "PORTUGAL", "BRAZIL", "ENGLAND", "FRANCE", "ITALY"]
-    
     final_info = {'num_age_groups': len(final_proposal), 'total_teams': sum(g['teams'] for g in final_proposal), 'total_players': sum(g['teams']*g['players_per_team'] for g in final_proposal), 'used_pitches': 14, 'spare_pitches': 0}
-    
     rosters_final = {g['age']: COUNTRIES[:g['teams']] for g in final_proposal}
     
-    alloc_final = allocate_tournament("Final Recommended Proposal", final_proposal)
-    master_final = generate_master_schedule(alloc_final['allocations'], rosters_final)
+    alloc_final = allocate_tournament("Final Recommended Proposal", final_proposal, use_cache=use_cache)
+    master_final = generate_master_schedule(alloc_final['allocations'], rosters_final, use_cache=use_cache)
+    
     export_to_csv(master_final, "master_schedule_final.csv")
     generate_summary_dashboard(alloc_final['allocations'], master_final, "Final Recommended Proposal", "index.html", config_info=final_info, discovery_configs=configs)
     generate_detailed_html_grid(master_final, alloc_final['allocations'], "master_schedule_grid_final.html")
