@@ -48,11 +48,12 @@ def schedule_6_teams(teams, use_cache=True):
         cached = SCHEDULE_CACHE["6_teams"]
         return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in cached]
 
-    # Hardcoded optimal stagger for perfectly even rest
-    # Flipped some pairs to ensure Home/Away balance for every team (0-5)
+    # Hardcoded optimal stagger for perfectly even rest AND full listing fairness
+    # Sequence: (T1, T2) where T1 is Home, T2 is Away.
+    # Every team (0-5) appears 5 times, mix of Home/Away, never in adjacent slots.
     optimal_sequence = [
-        (0,1), (3,2), (4,5), (2,0), (5,3), (1,4), (0,3), (4,2),
-        (5,1), (3,4), (2,5), (1,0), (5,0), (4,3), (1,2)
+        (0,1), (2,3), (4,5), (1,3), (0,4), (5,2), (3,0), (2,4), 
+        (1,5), (0,2), (3,5), (4,1), (5,0), (2,1), (3,4)
     ]
     
     # Available slots: 1-7 and 9-16 (skipping 8)
@@ -84,7 +85,7 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None,
         return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in cached]
 
     best_schedule = []
-    best_overall_score = -9999999
+    best_overall_score = -999999999
     
     # Map teams to indices for caching
     team_to_idx = {t: i for i, t in enumerate(teams)}
@@ -96,10 +97,10 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None,
     for slot in physical_slots:
         for p in range(num_pitches):
             if m_idx < len(matches):
-                fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1': matches[m_idx][0], 't2': matches[m_idx][1]})
+                fallback_schedule.append({'slot': slot, 'pitch_idx': p, 't1_idx': idx_matches[m_idx][0], 't2_idx': idx_matches[m_idx][1]})
                 m_idx += 1
                 
-    for _ in range(10000): # Run 10000 variations
+    for _ in range(20000): # Run 20,000 variations for deep search
         shuffled_indices = idx_matches[:]
         random.shuffle(shuffled_indices)
         remaining = shuffled_indices[:]
@@ -170,17 +171,21 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots, size_key=None,
                     listing_penalty += 1
 
             # SCORING ENGINE:
-            # 1. Listing Fairness (must have at least one of each)
+            # 1. Listing Fairness (Highest priority)
             # 2. Triple back-to-back penalty
-            # 3. Back-to-back penalty
+            # 3. Back-to-back penalty (High priority)
             # 4. Maximize min rest
-            # 5. Total rest
-            eval_score = (listing_penalty * -500000) + (max_consecutive_for_any_team * -100000) + (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
+            # 5. Total rest (Tiebreaker)
+            eval_score = (listing_penalty * -1000000) + (max_consecutive_for_any_team * -500000) + (back_to_back_count * -50000) + (min_rest_in_schedule * 1000) + total_rest_score
+            
+            if eval_score > best_overall_score:
+                best_overall_score = eval_score
+                best_schedule = scheduled
                 
     if best_schedule:
         if use_cache and size_key: SCHEDULE_CACHE[size_key] = best_schedule
         return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in best_schedule]
-    return fallback_schedule
+    return [{'slot': m['slot'], 'pitch_idx': m['pitch_idx'], 't1': teams[m['t1_idx']], 't2': teams[m['t2_idx']]} for m in fallback_schedule]
 
 def schedule_8_teams(teams, use_cache=True):
     """8 Teams, 2 Pitches, 28 Matches. Optimized for rest."""
@@ -747,7 +752,6 @@ if __name__ == "__main__":
         {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5, 'preferred_zone': 'JP4'},
     ]
     
-    COUNTRIES = ["IRELAND", "GERMANY", "SPAIN", "ARGENTINA", "HOLLAND", "PORTUGAL", "BRAZIL", "ENGLAND", "FRANCE", "ITALY"]
     final_info = {'num_age_groups': len(final_proposal), 'total_teams': sum(g['teams'] for g in final_proposal), 'total_players': sum(g['teams']*g['players_per_team'] for g in final_proposal), 'used_pitches': 14, 'spare_pitches': 0}
     rosters_final = {g['age']: COUNTRIES[:g['teams']] for g in final_proposal}
     
