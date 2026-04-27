@@ -27,8 +27,11 @@ def generate_round_robin(teams):
     for turn in range(n - 1):
         round_matches = []
         for i in range(half):
-            if teams[i] != 'Bye' and teams[n - 1 - i] != 'Bye':
-                round_matches.append((teams[i], teams[n - 1 - i]))
+            t1, t2 = teams[i], teams[n - 1 - i]
+            if t1 != 'Bye' and t2 != 'Bye':
+                # Alternate home/away to ensure listing fairness
+                if turn % 2 == 0: round_matches.append((t1, t2))
+                else: round_matches.append((t2, t1))
         matches.append(round_matches)
         
         teams.insert(1, teams.pop())
@@ -384,6 +387,26 @@ def perform_validation(master_schedule):
             if get_abstract_schedule(other) != base_sched:
                 consistency_pass = False
             
+    # Fairness Tracking
+    team_metrics = defaultdict(lambda: {'tue': 0, 'thu': 0, 'home': 0, 'away': 0})
+    for m in master_schedule:
+        s = m['slot']
+        age = m['age_group']
+        t1, t2 = f"{age}:{m['team1']}", f"{age}:{m['team2']}"
+        
+        for team in [t1, t2]:
+            if s <= 7: team_metrics[team]['tue'] += 1
+            elif s >= 9: team_metrics[team]['thu'] += 1
+            
+            if team == t1: team_metrics[team]['home'] += 1
+            else: team_metrics[team]['away'] += 1
+
+    nightly_balanced = True
+    listing_balanced = True
+    for team, stats in team_metrics.items():
+        if abs(stats['tue'] - stats['thu']) > 1: nightly_balanced = False
+        if stats['home'] == 0 or stats['away'] == 0: listing_balanced = False
+
     return {
         'status': 'PASS' if not clashes else 'FAIL',
         'clashes': clashes,
@@ -392,7 +415,9 @@ def perform_validation(master_schedule):
         'max_consecutive': max_consecutive + 1,
         'age_back_to_back': age_back_to_back,
         'min_rest': min_rest if min_rest < 99 else 0,
-        'consistency_pass': consistency_pass
+        'consistency_pass': consistency_pass,
+        'nightly_balanced': nightly_balanced,
+        'listing_balanced': listing_balanced
     }
 
 def generate_master_schedule(allocations, team_rosters, use_cache=True):
@@ -552,11 +577,16 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     # 4. Validation Report with Age Breakdown
     consecutive_msg = "No team is playing more than 2 games in a row." if val['max_consecutive'] <= 2 else f"Warning: Some teams play {val['max_consecutive']} games in a row."
     consistency_msg = "PASS" if val['consistency_pass'] else "FAIL"
+    nightly_msg = "PASS" if val['nightly_balanced'] else "WARN (Some teams have uneven Tue/Thu split)"
+    listing_msg = "PASS" if val['listing_balanced'] else "WARN (Some teams are always Team 1 or Team 2)"
+    
     html += f"""</tbody></table></div><hr><h2>4. Validation & Quality Report</h2>
     <div style="background: #fdfefe; border: 1px solid #dcdfe0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <p><strong>Integrity Status:</strong> <span class="status-pass">{val['status']}</span> (No Clashes, No Double-Bookings)</p>
         <p><strong>Round Robin Status:</strong> <span class="status-pass">PASS</span> (All teams play N-1 games)</p>
         <p><strong>Schedule Consistency:</strong> <span class="status-pass">{consistency_msg}</span> (Same-size age groups have identical match sequences)</p>
+        <p><strong>Nightly Load Balance:</strong> <span class="status-pass">{nightly_msg}</span> (Teams have an even split between Tue and Thu sessions)</p>
+        <p><strong>Listing Fairness:</strong> <span class="status-pass">{listing_msg}</span> (Teams have a mix of Team 1/Home and Team 2/Away positions)</p>
         <p><strong>Rest Spacing Quality:</strong> There are <span class="status-warn">{val['back_to_back']}</span> instances of back-to-back games, spread across {val['back_to_back_teams_count']} different teams. <strong>{consecutive_msg}</strong></p>
         <div class="validation-grid">"""
     
