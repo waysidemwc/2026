@@ -438,16 +438,12 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         for p in a['assigned_pitches']: zones[p['zone']].append({'name': p['name'], 'age': a['age_group']})
             
     # Map age groups to specific color classes
-    # Supports both specific names and generic discovery names (U6, U7, etc.)
     age_color_map = {
-        'U10 Mixed': 'cell-u10', 'U10': 'cell-u10',
-        'U11 Mixed': 'cell-u11', 'U11': 'cell-u11',
-        'U12 Mixed': 'cell-u12', 'U12': 'cell-u12',
-        'U13 Mixed': 'cell-u13', 'U13': 'cell-u13',
-        'U8 Boys': 'cell-u8',    'U8': 'cell-u8',
-        'U6/U7 Boys': 'cell-u6u7', 'U6': 'cell-u6u7', 'U7': 'cell-u6u7',
-        'U9 Mixed': 'cell-u9',    'U9': 'cell-u9',
-        'U7/U8 Girls': 'cell-u7u8'
+        'U6': 'cell-u6', 'U7': 'cell-u7', 'U8': 'cell-u8', 'U9': 'cell-u9',
+        'U10': 'cell-u10', 'U11': 'cell-u11', 'U12': 'cell-u12', 'U13': 'cell-u13', 'U14': 'cell-u14',
+        'U6/U7 Boys': 'cell-u6', 'U8 Boys': 'cell-u8', 'U9 Mixed': 'cell-u9',
+        'U10 Mixed': 'cell-u10', 'U11 Mixed': 'cell-u11', 'U12 Mixed': 'cell-u12',
+        'U13 Mixed': 'cell-u13', 'U7/U8 Girls': 'cell-u7u8'
     }
 
     # Pitch to Age mapping for the Age column
@@ -482,13 +478,18 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .fixture { font-size: 0.8em; line-height: 1.1; font-weight: bold; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
-        .cell-u10 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
-        .cell-u11 { background-color: #abebc6; color: #1e8449; font-weight: bold;}
-        .cell-u12 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
-        .cell-u13 { background-color: #aed6f1; color: #21618c; font-weight: bold;}
-        .cell-u8 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
-        .cell-u6u7 { background-color: #fad7a0; color: #b9770e; font-weight: bold;}
-        .cell-u9 { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-u6  { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
+        .cell-u7  { background-color: #abebc6; color: #1e8449; font-weight: bold;}
+        .cell-u8  { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
+        .cell-u9  { background-color: #fad7a0; color: #b9770e; font-weight: bold;}
+        .cell-u10 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
+        .cell-u11 { background-color: #aed6f1; color: #21618c; font-weight: bold;}
+        .cell-u12 { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-u13 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
+        .cell-u14 { background-color: #f1948a; color: #943126; font-weight: bold;}
+        
+        /* Specific naming variants */
+        .cell-u6u7 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
         .cell-u7u8 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
         
         /* Fallbacks */
@@ -671,9 +672,11 @@ if __name__ == "__main__":
     output_dir = "options_output"
     if not os.path.exists(output_dir): os.makedirs(output_dir)
     
+    COUNTRIES = ["IRELAND", "GERMANY", "SPAIN", "ARGENTINA", "HOLLAND", "PORTUGAL", "BRAZIL", "ENGLAND", "FRANCE", "ITALY"]
+    
     for i, c in enumerate(configs, 1):
         age_groups = map_config_to_ages(c)
-        rosters = {g['age']: [f"T{j}" for j in range(1, g['teams']+1)] for g in age_groups}
+        rosters = {g['age']: COUNTRIES[:g['teams']] for g in age_groups}
         alloc = allocate_tournament(f"Option {i}", age_groups, use_cache=use_cache)
         master = generate_master_schedule(alloc['allocations'], rosters, use_cache=use_cache)
         generate_summary_dashboard(alloc['allocations'], master, alloc['title'], os.path.join(output_dir, f"summary_dashboard_option_{i}.html"), config_info=c, index_link="../index.html")
