@@ -413,7 +413,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
 
     pitch_schedule = defaultdict(dict)
     for m in master_schedule: 
-        pitch_schedule[m['pitch_id']][m['slot']] = f"{m['team1']}<br>vs<br>{m['team2']}"
+        pitch_schedule[m['pitch_id']][m['slot']] = f"<div class='fixture'>{m['team1']}<br>vs<br>{m['team2']}</div>"
 
     nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; Back to Recommended Proposal Index</a></div>' if index_link else ""
     
@@ -434,6 +434,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .table-container { overflow-x: auto; margin-bottom: 40px; }
         table { width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.8em; }
+        .fixture { font-size: 0.85em; line-height: 1.2; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
         .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
