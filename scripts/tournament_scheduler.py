@@ -269,42 +269,45 @@ def allocate_tournament(option_name, age_groups, use_cache=True):
         'JP4': [p for p in PITCH_INVENTORY if p['zone'] == 'JP4'],
     }
     
-    # Sort groups: those with explicit zones first, then by size
-    sorted_groups = sorted(age_groups, key=lambda x: (x.get('preferred_zone') is None, -get_requirements(x['teams'])[1]))
-    
     allocations_map = {}
-    for group in sorted_groups:
+    
+    # First pass: Allocate groups that have a preferred zone
+    for group in age_groups:
+        preferred_zone = group.get('preferred_zone')
+        if not preferred_zone: continue
+            
         age = group['age']
         teams = group['teams']
         players_per = group.get('players_per_team', 0)
         matches, pitches_needed = get_requirements(teams)
-        preferred_zone = group.get('preferred_zone')
         
-        placed = False
-        zones_to_try = [preferred_zone] if preferred_zone else ['JP1', 'JP2', 'JP3', 'JP4']
-        
-        for z_name in zones_to_try:
-            if z_name in zone_inventory and len(zone_inventory[z_name]) >= pitches_needed:
-                assigned = [zone_inventory[z_name].pop(0) for _ in range(pitches_needed)]
-                allocations_map[age] = {
-                    'age_group': age, 'teams': teams, 'players_per_team': players_per,
-                    'total_players': teams * players_per, 'matches': matches,
-                    'pitches_req': pitches_needed, 'assigned_pitches': assigned
-                }
-                placed = True
-                break
-        
-        if not placed:
-            # Fallback: grab whatever is left across all zones
-            assigned = []
-            for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
-                while zone_inventory[z_name] and len(assigned) < pitches_needed:
-                    assigned.append(zone_inventory[z_name].pop(0))
+        if len(zone_inventory[preferred_zone]) >= pitches_needed:
+            assigned = [zone_inventory[preferred_zone].pop(0) for _ in range(pitches_needed)]
             allocations_map[age] = {
                 'age_group': age, 'teams': teams, 'players_per_team': players_per,
                 'total_players': teams * players_per, 'matches': matches,
                 'pitches_req': pitches_needed, 'assigned_pitches': assigned
             }
+            
+    # Second pass: Allocate remaining groups to any available space
+    for group in age_groups:
+        age = group['age']
+        if age in allocations_map: continue
+            
+        teams = group['teams']
+        players_per = group.get('players_per_team', 0)
+        matches, pitches_needed = get_requirements(teams)
+        
+        assigned = []
+        for z_name in ['JP1', 'JP2', 'JP3', 'JP4']:
+            while zone_inventory[z_name] and len(assigned) < pitches_needed:
+                assigned.append(zone_inventory[z_name].pop(0))
+        
+        allocations_map[age] = {
+            'age_group': age, 'teams': teams, 'players_per_team': players_per,
+            'total_players': teams * players_per, 'matches': matches,
+            'pitches_req': pitches_needed, 'assigned_pitches': assigned
+        }
             
     final_allocations = []
     for g in age_groups: final_allocations.append(allocations_map[g['age']])
