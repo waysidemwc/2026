@@ -474,7 +474,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     for p in PITCH_INVENTORY:
         age_group_name = pitch_to_age.get(p['id'], "-")
         zone_cls = f"cell-{p['zone'].lower()}"
-        html += f"<tr><td><strong>{p['name']}</strong></td><td class='{zone_cls}'><small>{age_group_name}</small></td>"
+        html += f"<tr><td class='{zone_cls}'><strong>{p['name']}</strong></td><td class='{zone_cls}'><small>{age_group_name}</small></td>"
         for s in range(1, 17):
             fixture = pitch_schedule[p['id']].get(s)
             html += f'<td class="{zone_cls}">{fixture if fixture else "-"}</td>'
@@ -617,8 +617,13 @@ if __name__ == "__main__":
         {'age': 'U13 Mixed', 'teams': 8, 'players_per_team': 8, 'preferred_zone': 'JP2'},
         {'age': 'U7/U8 Girls', 'teams': 6, 'players_per_team': 5, 'preferred_zone': 'JP4'},
     ]
+    
+    COUNTRIES = ["IRELAND", "GERMANY", "SPAIN", "ARGENTINA", "HOLLAND", "PORTUGAL", "BRAZIL", "ENGLAND", "FRANCE", "ITALY"]
+    
     final_info = {'num_age_groups': len(final_proposal), 'total_teams': sum(g['teams'] for g in final_proposal), 'total_players': sum(g['teams']*g['players_per_team'] for g in final_proposal), 'used_pitches': 14, 'spare_pitches': 0}
-    rosters_final = {g['age']: [f"T{j}" for j in range(1, g['teams']+1)] for g in final_proposal}
+    
+    rosters_final = {g['age']: COUNTRIES[:g['teams']] for g in final_proposal}
+    
     alloc_final = allocate_tournament("Final Recommended Proposal", final_proposal)
     master_final = generate_master_schedule(alloc_final['allocations'], rosters_final)
     export_to_csv(master_final, "master_schedule_final.csv")
