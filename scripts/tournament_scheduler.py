@@ -438,11 +438,16 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         for p in a['assigned_pitches']: zones[p['zone']].append({'name': p['name'], 'age': a['age_group']})
             
     # Map age groups to specific color classes
+    # Supports both specific names and generic discovery names (U6, U7, etc.)
     age_color_map = {
-        'U10 Mixed': 'cell-u10', 'U11 Mixed': 'cell-u11',
-        'U12 Mixed': 'cell-u12', 'U13 Mixed': 'cell-u13',
-        'U8 Boys': 'cell-u8', 'U6/U7 Boys': 'cell-u6u7',
-        'U9 Mixed': 'cell-u9', 'U7/U8 Girls': 'cell-u7u8'
+        'U10 Mixed': 'cell-u10', 'U10': 'cell-u10',
+        'U11 Mixed': 'cell-u11', 'U11': 'cell-u11',
+        'U12 Mixed': 'cell-u12', 'U12': 'cell-u12',
+        'U13 Mixed': 'cell-u13', 'U13': 'cell-u13',
+        'U8 Boys': 'cell-u8',    'U8': 'cell-u8',
+        'U6/U7 Boys': 'cell-u6u7', 'U6': 'cell-u6u7', 'U7': 'cell-u6u7',
+        'U9 Mixed': 'cell-u9',    'U9': 'cell-u9',
+        'U7/U8 Girls': 'cell-u7u8'
     }
 
     # Pitch to Age mapping for the Age column
