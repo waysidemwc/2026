@@ -40,7 +40,7 @@ The project uses a strict zone-based allocation strategy:
 
 ### Data Structures
 - **CSV Format:** The master schedule is exported with headers: `age_group, slot, time_label, zone, pitch_name, pitch_id, team1, team2`.
-- **Slot Timing:** Matches are 12 minutes with a 3-minute gap (15-minute slots). Core sessions run on Tuesday and Thursday evenings, concluding by 8:15 PM.
+- **Slot Timing:** Matches are 12 minutes with a 3-minute gap (15-minute slots). Core sessions run on Tuesday and Thursday evenings, concluding by 8:30 PM latest.
 
 ### Visual Standards
 - Dashboard colors are synchronized with the JP pitch zones:

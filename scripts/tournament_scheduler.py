@@ -160,7 +160,7 @@ def schedule_8_teams(teams):
     """8 Teams, 2 Pitches, 28 Matches. Optimized for rest."""
     rounds = generate_round_robin(teams)
     all_matches = [m for r in rounds for m in r]
-    # Use slots 1-14 only (7 per night) so 8-team groups finish at 8:15 PM
+    # Use slots 1-14 only (7 per night) so 8-team groups finish at 8:30 PM latest
     physical_slots = list(range(1, 15))
     return optimize_spacing(teams, all_matches, num_pitches=2, physical_slots=physical_slots)
 
@@ -496,7 +496,7 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
                         <ul style="padding-left: 20px;">
                             <li><strong>14 pitches</strong> (or 13 Pitches + 1 spare)</li>
                             <li><strong>15 minutes per slot:</strong> 12 min match + 3 min gap</li>
-                            <li><strong>Session Timing:</strong> both Tue and Thu finish at 8:15 PM</li>
+                            <li><strong>Session Timing:</strong> both Tue and Thu finish at 8:30 PM latest</li>
                             <li><strong>Minimal Movement:</strong> Age groups are ring-fenced to specific dedicated pitches</li>
                         </ul>
                     </div>
