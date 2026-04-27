@@ -75,9 +75,15 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
         total_rest_score = 0
         back_to_back_count = 0
         
+        team_consecutive_tracker = {t: 0 for t in teams}
+        max_consecutive_for_any_team = 0
+        
         for slot in physical_slots:
             slot_matches = []
             teams_in_slot = set()
+            
+            # Reset tracker for teams NOT playing in this slot
+            # (We will update teams WHO ARE playing inside the match loop)
             
             while len(slot_matches) < num_pitches and remaining:
                 best_match = None
@@ -86,12 +92,11 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                 for m in remaining:
                     t1, t2 = m
                     if t1 in teams_in_slot or t2 in teams_in_slot:
-                        continue # Team cannot play twice in the same time slot
+                        continue 
                         
                     dist1 = slot - team_last_played[t1]
                     dist2 = slot - team_last_played[t2]
                     
-                    # Core optimization: favor the match where BOTH teams have rested the longest
                     score = min(dist1, dist2)
                     
                     if score > best_match_score:
@@ -102,7 +107,6 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                     d1 = slot - team_last_played[best_match[0]]
                     d2 = slot - team_last_played[best_match[1]]
                     
-                    # Track actual rests
                     if 0 < d1 < 50: 
                         min_rest_in_schedule = min(min_rest_in_schedule, d1)
                         total_rest_score += d1
@@ -119,21 +123,32 @@ def optimize_spacing(teams, matches, num_pitches, physical_slots):
                     break 
             
             for i, m in enumerate(slot_matches):
-                team_last_played[m[0]] = slot
-                team_last_played[m[1]] = slot
+                t1, t2 = m[0], m[1]
+                
+                # Update consecutive tracking
+                for t in [t1, t2]:
+                    if slot == team_last_played[t] + 1:
+                        team_consecutive_tracker[t] += 1
+                    else:
+                        team_consecutive_tracker[t] = 0
+                    max_consecutive_for_any_team = max(max_consecutive_for_any_team, team_consecutive_tracker[t])
+
+                team_last_played[t1] = slot
+                team_last_played[t2] = slot
                 scheduled.append({
                     'slot': slot,
                     'pitch_idx': i,
-                    't1': m[0],
-                    't2': m[1]
+                    't1': t1,
+                    't2': t2
                 })
                 
         if not remaining:
             # SCORING ENGINE:
-            # 1. Heavily penalize back-to-back games (interval=1)
-            # 2. Maximize the minimum rest any team gets. 
-            # 3. Tiebreaker: total aggregate rest.
-            eval_score = (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
+            # 1. Heavily penalize 3+ games in a row (triple back-to-back)
+            # 2. Penalize back-to-back games (interval=1)
+            # 3. Maximize the minimum rest any team gets. 
+            # 4. Tiebreaker: total aggregate rest.
+            eval_score = (max_consecutive_for_any_team * -100000) + (back_to_back_count * -10000) + (min_rest_in_schedule * 1000) + total_rest_score
             
             if eval_score > best_overall_score:
                 best_overall_score = eval_score
@@ -296,6 +311,9 @@ def perform_validation(master_schedule):
     slot_pitch_occupancy = defaultdict(list)
     team_slot_occupancy = defaultdict(list)
     team_last_slot = {}
+    team_consecutive_count = defaultdict(int)
+    max_consecutive = 0
+    back_to_back_teams = set()
     back_to_back_count = 0
     age_back_to_back = defaultdict(int)
     min_rest = 99
@@ -318,6 +336,11 @@ def perform_validation(master_schedule):
                 if interval == 1: 
                     back_to_back_count += 1
                     age_back_to_back[age] += 1
+                    back_to_back_teams.add(team)
+                    team_consecutive_count[team] += 1
+                else:
+                    team_consecutive_count[team] = 0
+                max_consecutive = max(max_consecutive, team_consecutive_count[team])
                 min_rest = min(min_rest, interval)
             team_last_slot[team] = s
             
@@ -325,6 +348,8 @@ def perform_validation(master_schedule):
         'status': 'PASS' if not clashes else 'FAIL',
         'clashes': clashes,
         'back_to_back': back_to_back_count,
+        'back_to_back_teams_count': len(back_to_back_teams),
+        'max_consecutive': max_consecutive + 1, # count as games (1 back-to-back = 2 games)
         'age_back_to_back': age_back_to_back,
         'min_rest': min_rest if min_rest < 99 else 0
     }
@@ -444,11 +469,12 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         html += "</tr>"
     
     # 4. Validation Report with Age Breakdown
+    consecutive_msg = "No team is playing more than 2 games in a row." if val['max_consecutive'] <= 2 else f"Warning: Some teams play {val['max_consecutive']} games in a row."
     html += f"""</tbody></table></div><hr><h2>4. Validation & Quality Report</h2>
     <div style="background: #fdfefe; border: 1px solid #dcdfe0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <p><strong>Integrity Status:</strong> <span class="status-pass">{val['status']}</span> (No Clashes, No Double-Bookings)</p>
         <p><strong>Round Robin Status:</strong> <span class="status-pass">PASS</span> (All teams play N-1 games)</p>
-        <p><strong>Rest Spacing Quality:</strong> There are <span class="status-warn">{val['back_to_back']}</span> instances of back-to-back games across the entire tournament.</p>
+        <p><strong>Rest Spacing Quality:</strong> There are <span class="status-warn">{val['back_to_back']}</span> instances of back-to-back games, spread across {val['back_to_back_teams_count']} different teams. <strong>{consecutive_msg}</strong></p>
         <div class="validation-grid">"""
     
     for a in allocations:
