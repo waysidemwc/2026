@@ -100,6 +100,45 @@ def validate_csv(filename):
     for age, pitches in age_group_pitches.items():
         print(f"   - {age}: Uses {len(pitches)} pitch(es) ({', '.join(sorted(pitches))})")
 
+    print(f"\n5. Schedule Consistency (Same-Size Groups):")
+    # group by team count
+    size_to_groups = defaultdict(list)
+    for age, teams in age_group_teams.items():
+        size_to_groups[len(teams)].append(age)
+    
+    # helper to get "abstract" schedule for a group
+    def get_abstract_schedule(age_group):
+        # Sort matches by slot and teams
+        group_data = [row for row in data if row['age_group'] == age_group]
+        # Sort teams in this group to establish index mapping
+        teams = sorted(list(age_group_teams[age_group]))
+        team_map = {t: i for i, t in enumerate(teams)}
+        
+        abstract = []
+        for row in sorted(group_data, key=lambda x: (int(x['slot']), x['team1'], x['team2'])):
+            t1 = f"{age_group}:{row['team1']}"
+            t2 = f"{age_group}:{row['team2']}"
+            abstract.append((int(row['slot']), team_map[t1], team_map[t2]))
+        return abstract
+
+    all_consistent = True
+    for size, groups in size_to_groups.items():
+        if len(groups) < 2: continue
+        
+        base_group = groups[0]
+        base_sched = get_abstract_schedule(base_group)
+        
+        for other_group in groups[1:]:
+            other_sched = get_abstract_schedule(other_group)
+            if base_sched != other_sched:
+                print(f"   [FAIL] {other_group} ({size} teams) has a different schedule pattern than {base_group}.")
+                all_consistent = False
+            else:
+                print(f"   [OK] {other_group} schedule matches {base_group} ({size} teams).")
+    
+    if all_consistent:
+        print("   [OK] All same-size age groups have identical schedules.")
+
 if __name__ == "__main__":
     target = "master_schedule_final.csv"
     if len(sys.argv) > 1:

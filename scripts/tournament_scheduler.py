@@ -330,10 +330,14 @@ def perform_validation(master_schedule):
     age_back_to_back = defaultdict(int)
     min_rest = 99
     
+    age_group_teams = defaultdict(set)
     for m in master_schedule:
+        age = m['age_group']
+        age_group_teams[age].add(f"{age}:{m['team1']}")
+        age_group_teams[age].add(f"{age}:{m['team2']}")
+        
         s = m['slot']
         p = m['pitch_id']
-        age = m['age_group']
         t1 = f"{age}:{m['team1']}"
         t2 = f"{age}:{m['team2']}"
         
@@ -355,15 +359,40 @@ def perform_validation(master_schedule):
                 max_consecutive = max(max_consecutive, team_consecutive_count[team])
                 min_rest = min(min_rest, interval)
             team_last_slot[team] = s
+
+    # Consistency Check
+    size_to_groups = defaultdict(list)
+    for age, teams in age_group_teams.items():
+        size_to_groups[len(teams)].append(age)
+    
+    def get_abstract_schedule(age_group):
+        group_data = [m for m in master_schedule if m['age_group'] == age_group]
+        teams = sorted(list(age_group_teams[age_group]))
+        team_map = {t: i for i, t in enumerate(teams)}
+        abstract = []
+        for m in sorted(group_data, key=lambda x: (int(x['slot']), x['team1'], x['team2'])):
+            t1 = f"{age_group}:{m['team1']}"
+            t2 = f"{age_group}:{m['team2']}"
+            abstract.append((int(m['slot']), team_map[t1], team_map[t2]))
+        return abstract
+
+    consistency_pass = True
+    for size, groups in size_to_groups.items():
+        if len(groups) < 2: continue
+        base_sched = get_abstract_schedule(groups[0])
+        for other in groups[1:]:
+            if get_abstract_schedule(other) != base_sched:
+                consistency_pass = False
             
     return {
         'status': 'PASS' if not clashes else 'FAIL',
         'clashes': clashes,
         'back_to_back': back_to_back_count,
         'back_to_back_teams_count': len(back_to_back_teams),
-        'max_consecutive': max_consecutive + 1, # count as games (1 back-to-back = 2 games)
+        'max_consecutive': max_consecutive + 1,
         'age_back_to_back': age_back_to_back,
-        'min_rest': min_rest if min_rest < 99 else 0
+        'min_rest': min_rest if min_rest < 99 else 0,
+        'consistency_pass': consistency_pass
     }
 
 def generate_master_schedule(allocations, team_rosters, use_cache=True):
@@ -491,10 +520,12 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     
     # 4. Validation Report with Age Breakdown
     consecutive_msg = "No team is playing more than 2 games in a row." if val['max_consecutive'] <= 2 else f"Warning: Some teams play {val['max_consecutive']} games in a row."
+    consistency_msg = "PASS" if val['consistency_pass'] else "FAIL"
     html += f"""</tbody></table></div><hr><h2>4. Validation & Quality Report</h2>
     <div style="background: #fdfefe; border: 1px solid #dcdfe0; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
         <p><strong>Integrity Status:</strong> <span class="status-pass">{val['status']}</span> (No Clashes, No Double-Bookings)</p>
         <p><strong>Round Robin Status:</strong> <span class="status-pass">PASS</span> (All teams play N-1 games)</p>
+        <p><strong>Schedule Consistency:</strong> <span class="status-pass">{consistency_msg}</span> (Same-size age groups have identical match sequences)</p>
         <p><strong>Rest Spacing Quality:</strong> There are <span class="status-warn">{val['back_to_back']}</span> instances of back-to-back games, spread across {val['back_to_back_teams_count']} different teams. <strong>{consecutive_msg}</strong></p>
         <div class="validation-grid">"""
     
