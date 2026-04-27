@@ -450,9 +450,9 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
     nav_html = f'<div style="text-align: center; margin-bottom: 20px;"><a href="{index_link}" style="color: #3498db; text-decoration: none; font-weight: bold;">&larr; Back to Recommended Proposal Index</a></div>' if index_link else ""
     
     css = """
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+        body { font-family: Arial, sans-serif; margin: 10px; background-color: #f4f7f6; color: #333; }
         h1, h2 { text-align: center; color: #2c3e50; }
-        .container { max-width: 1300px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .container { width: 98%; max-width: 1800px; margin: 0 auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .summary-bar { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
         .summary-item { text-align: center; }
         .summary-item .val { display: block; font-size: 1.5em; font-weight: bold; }
@@ -465,8 +465,8 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .jp1 { background-color: #27ae60; } .jp2 { background-color: #2980b9; } .jp3 { background-color: #e67e22; } .jp4 { background-color: #c0392b; }
         .table-container { overflow-x: auto; margin-bottom: 40px; }
         table { width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.8em; }
-        .fixture { font-size: 0.85em; line-height: 1.2; }
+        th, td { border: 1px solid #ddd; padding: 4px 2px; font-size: 0.75em; }
+        .fixture { font-size: 0.8em; line-height: 1.1; font-weight: bold; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
         .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
