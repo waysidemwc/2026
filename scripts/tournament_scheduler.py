@@ -478,19 +478,26 @@ def generate_summary_dashboard(allocations, master_schedule, title, filename="su
         .fixture { font-size: 0.8em; line-height: 1.1; font-weight: bold; }
         th { background-color: #ecf0f1; color: #2c3e50; }
         .day-header { background-color: #34495e; color: white; font-weight: bold; }
-        .cell-u6  { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
-        .cell-u7  { background-color: #abebc6; color: #1e8449; font-weight: bold;}
-        .cell-u8  { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
-        .cell-u9  { background-color: #fad7a0; color: #b9770e; font-weight: bold;}
-        .cell-u10 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
-        .cell-u11 { background-color: #aed6f1; color: #21618c; font-weight: bold;}
-        .cell-u12 { background-color: #fadbd8; color: #943126; font-weight: bold;}
-        .cell-u13 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
-        .cell-u14 { background-color: #f1948a; color: #943126; font-weight: bold;}
+        /* JP1 - Green Zone (U10, U11) */
+        .cell-u10 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
+        .cell-u11 { background-color: #abebc6; color: #1e8449; font-weight: bold;}
+        
+        /* JP2 - Blue Zone (U12, U13) */
+        .cell-u12 { background-color: #d6eaf8; color: #21618c; font-weight: bold;}
+        .cell-u13 { background-color: #aed6f1; color: #21618c; font-weight: bold;}
+        
+        /* JP3 - Orange Zone (U6, U7, U8) */
+        .cell-u6   { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
+        .cell-u7   { background-color: #fad7a0; color: #b9770e; font-weight: bold;}
+        .cell-u8   { background-color: #f8c471; color: #b9770e; font-weight: bold;}
+        
+        /* JP4 - Red Zone (U9, Girls) */
+        .cell-u9   { background-color: #fadbd8; color: #943126; font-weight: bold;}
+        .cell-u7u8 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
+        .cell-u14  { background-color: #f1948a; color: #943126; font-weight: bold;}
         
         /* Specific naming variants */
-        .cell-u6u7 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
-        .cell-u7u8 { background-color: #f5b7b1; color: #943126; font-weight: bold;}
+        .cell-u6u7 { background-color: #fdebd0; color: #b9770e; font-weight: bold;}
         
         /* Fallbacks */
         .cell-jp1 { background-color: #d5f5e3; color: #1e8449; font-weight: bold;}
